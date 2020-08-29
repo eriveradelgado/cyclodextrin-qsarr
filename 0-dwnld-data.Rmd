@@ -1,0 +1,167 @@
+---
+title: 'Step 0: Downloading Experimental Observations'
+author: "Al Xin"
+date: "August 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Ka_to_delG <- function(ka) {
+  -8.314*298*log(ka)/1000
+}
+```
+
+## Overview
+
+Before building the model, we first need to collect experimental data.
+
+This step will download observations of binding affinity with cyclodextrin and perform an initial clean of the data. Because the tables will largely be read as HTML tables from online sources, we will make sure that the tables are in neat R data frames for the next steps in the cleaning process. 
+
+## Dependencies
+
+This step requires the following packages:
+
+- `data.table`
+- `dplyr`
+- `httr`
+- `stringr`
+- `tabulizer`
+- `XML`
+
+Raw data will be stored in `data-raw`. Data that has been cast into an R data frame but whose contents are unaltered will be in `data-derived`. 
+
+```{r packages, message = F, warning = F, results = "hide"}
+packages <- c("data.table", "dplyr", "httr", "stringr", "tabulizer", "XML")
+# mapply(install.packages, packages)
+lapply(packages, library, character.only = T)
+if (!dir.exists("data-raw")) dir.create("data-raw")
+if (!dir.exists("data-derived")) dir.create("data-derived")
+```
+
+
+## Data source
+
+The following steps will not work if the network does not have access to academic publications, so academic credentials to access journals or an academic VPN is requires for the section to execute correctly. 
+
+### Rekharsky and Inoue (2001)
+
+The data comes from three sources. The first is a paper titled "Complexation Thermodynamics of Cyclodextrins" published by Mikhail V. Rekharsky and Yoshihisa Inoue in 1998. It compiles a list of experimentally determined binding affinities of various small molecules with α-, β-, and γ-cyclodextrin. The results are sourced from a variety of methods and solvent conditions (varying pH, temperature, etc.) 
+
+The following retrieves the HTML table containing the raw data and then compiles it into a list. 
+
+```{r dwnld_ri, eval = F}
+ri_html <- GET("https://doi.org/10.1021/cr970015o")
+ri_list <- readHTMLTable(
+  rawToChar(ri_html$content), 
+  header = T,
+  as.data.frame = T,
+  stringAsFactors = F
+)
+saveRDS(ri_list, file = "data-raw/ri-list.RDS")
+```
+
+Many elements of the above list do not contain any information on binding affinity, so we need to select the correct elements of the list. The elements that are part of the table on binding affinity have length 10. 
+
+```{r ri_index, eval = F}
+ri_list <- readRDS("data-raw/ri-list.RDS")
+ri_index <- ri_list %>% 
+  lapply(names) %>% 
+  lapply(length) >= 10 %>% 
+  as.vector()
+```
+
+Additionally, we need to make the header titles consistent and understandable for the prepared dataframe. The created data frame is then saved for later cleaning.
+
+```{r ri_bind, message = F, warning = F, eval = F}
+ri_df <- ri_list[ri_index] %>%
+  lapply(
+    function(x) 
+      setNames(
+        mutate_all(x, as.character)[, c(1, 2, 6, 3, 4, length(x))], 
+        c("host", "guest", "dG", "solvent", "temp", "ref")
+      )
+    ) %>%
+  bind_rows() %>%
+  mutate(host = str_replace_all(host, "1\u03b1", "alpha")) %>%
+  mutate(host = str_replace_all(host, "1\u03b2", "beta")) %>%
+  mutate(host = str_replace_all(host, "1\u03b3", "gamma"))
+saveRDS(ri_df, "data-derived/ri-df.RDS")
+```
+
+### Suzuki (2001)
+
+The second source is "A Nonlinear Group Contribution Method for Predicting the Free Energies of Inclusion Complexation of Organic Molecules with α- and β-Cyclodextrins", published by Takahiro Suzuki in 2001. Unlike the Rekharsky and Inoue source, there are no observations of binding affinity with γ-cyclodextrin.
+
+We will perform similar steps to retrieve the HTML file and create a single R data frame. The elements that are part of the table on binding affinity have length 11. 
+
+```{r dwnld_suzuki, eval = F}
+suzuki_html <- GET("https://doi.org/10.1021/ci010295f")
+suzuki_list <-
+  readHTMLTable(
+    rawToChar(suzuki_html$content),
+    header = T,
+    as.data.frame = T,
+    stringAsFactors = F
+  )
+saveRDS(suzuki_list, "data-raw/suzuki-list.RDS")
+
+suzuki_index <- suzuki_list %>% 
+  lapply(names) %>% 
+  lapply(length) == 11 %>% 
+  as.vector()
+```
+
+The Suzuki data table is wide, not long. Additionally, it only contains molecules that have binding affinity data for both α- and β-cyclodextrins. In contrast, the Rekharsky and Inoue data table does not necessarily contain binding affinity data for all three cyclodextrin types for all the molecules listed. 
+
+As a result, to collect the α-cyclodextrin binding affinity, we need to retrieve the 4th column and to collect the β-cyclodextrin affinity we need to retrieve the 8th column. We can then combine the tables into a single long table. 
+
+``` {r suzuki_bind, eval = F}
+suzuki_alpha <- suzuki_list[suzuki_index] %>%
+  lapply(
+    function(x)
+      mutate_all(x, as.character)[-1, c(2, 4)]
+  ) %>%
+  bind_rows() %>%
+  mutate(host = "alpha") %>%
+  setNames(c("guest", "dG", "host")) %>%
+  select(host, guest, dG)
+
+suzuki_beta <- suzuki_list[suzuki_index] %>%
+  lapply(
+    function(x)
+      mutate_all(x, as.character)[-1, c(2, 8)]
+  ) %>%
+  bind_rows() %>%
+  mutate(host = "beta") %>%
+  setNames(c("guest", "dG", "host")) %>%
+  select(host, guest, dG)
+
+suzuki_df <- rbind(suzuki_alpha, suzuki_beta)
+saveRDS(suzuki_df, "data-derived/suzuki-df.RDS")
+```
+
+### Singh (2015)
+
+The following was provided upon request of the supplementary material for the paper "High-throughput measurement of drug-cyclodextrin kinetic rate constants by small molecule microarray using surface plasmon resonance imaging" by Vikramjeet Singh et al in 2015. The PDF containing the raw data is pre-uploaded in `data-raw`.
+
+The table only provides Ka values. For consistency with the other two data sources, these will be converted into Gibbs free energy (kJ/mol) with the function `Ka_to_delG`.
+
+```{r singh, eval = F}
+singh_raw <- extract_tables("data-raw/singh.pdf")
+
+# Ka values are in the first table only
+singh <- data.frame(singh_raw[[1]][-1, 1:4])
+colnames(singh) <- c("guest", "alpha", "beta", "gamma")
+singh[, 2:4] <- sapply(singh[, 2:4], as.character) %>%
+  sapply(., as.numeric)
+singh[, 2:4] <- sapply(singh[ , 2:4], Ka_to_delG)
+singh <- melt(
+  data.table(singh),
+  id.vars = "guest",
+  measure.vars = c(2:4),
+  variable.name = "cd",
+  value.name = "dG"
+)
+saveRDS(singh, "data-derived/singh-df.RDS")
+```
