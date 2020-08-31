@@ -7,9 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-Ka_to_delG <- function(ka) {
-  -8.314*298*log(ka)/1000
-}
 ```
 
 ## Overview
@@ -20,14 +17,15 @@ This step will download observations of binding affinity with cyclodextrin and p
 
 ## Dependencies
 
-This step requires the following packages:
+There are several personal functions used throughout this project. They can be found and installed through GitHub using `devtools::install_github`.
 
-- `data.table`
-- `dplyr`
-- `httr`
-- `stringr`
-- `tabulizer`
-- `XML`
+```{r qsarr}
+if (!require("devtools")) install.packages("devtools")
+library(devtools)
+install_github("awqx/qsarr")
+```
+
+This step also requires the packages `data.table`, `dplyr`, `httr`, `stringr`, `tabulizer`, and `XML`.
 
 Raw data will be stored in `data-raw`. Data that has been cast into an R data frame but whose contents are unaltered will be in `data-derived`. 
 
@@ -38,7 +36,6 @@ lapply(packages, library, character.only = T)
 if (!dir.exists("data-raw")) dir.create("data-raw")
 if (!dir.exists("data-derived")) dir.create("data-derived")
 ```
-
 
 ## Data source
 
