@@ -1,0 +1,160 @@
+---
+title: 'Step 1: Cleaning the Data'
+author: "Al Xin"
+date: "August 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+In this step, typos will be removed and the conditions for the experimental data will be standardized (298 K, water as a solvent, neutral pH, etc.) The cleaned data will be stored in the directory `data/clean`.
+
+## Dependencies
+
+There are several personal functions used throughout this project. They can be found and installed through GitHub using `devtools::install_github`.
+
+```{r qsarr, message = F}
+if (!require("devtools")) install.packages("devtools")
+library(devtools)
+install_github("awqx/qsarr")
+```
+
+Packages needed in this step include `data.table`, `dplyr`, and `stringr`.
+
+```{r packages, message = F, warning = F}
+packages <- c("data.table", "stringr", "tidyverse")
+lapply(packages, library, character.only = T)
+if(!dir.exists("data/clean")) dir.create("data/clean")
+```
+
+## Rekharsky and Inoue dataset
+
+The data is read from the previous step. The data contains the following columns:
+- `host`: α-, β-, or γ-cyclodextrin (written as `"alpha", "beta", "gamma"`) 
+- `guest`: the ligand tested in the complex
+- `dG`: the change in Gibbs free energy of the complexation, in kJ/mol
+- `solvent`: a description of the solvent tested
+- `temp`: the temperature of the experiment
+- `ref`: the reference from the paper corresponding to the test
+
+### Solvent conditions 
+
+For consistency across observations, the data used will contain only observations conducted at 298 K in water as a solvent. Additionally, observations will be filtered to include observations from pH 6.8 to 7.5.
+
+The original dataset contains 1367 observations. After cleaning for solvent conditions, the dataset contains 813 observations.
+
+```{r ri_solvent}
+# Reading the data from the previous step
+ri_df <- readRDS("data/derived/ri-df.RDS")
+
+# Removing unusual separators and spaces
+ri <- ri_df %>%
+  lapply(
+    str_replace_all, pattern = "(\\â)|\u2212",
+    replacement = "-") %>%
+  lapply(str_replace_all, "(\\â+)|(Â·)|·|\u2009", " ") %>%
+  lapply(str_replace_all, "\\s+", " ") %>%
+  lapply(str_replace_all, "\\- ", "-") %>%
+  as_tibble() %>%
+  mutate(guest = str_replace_all(guest, "\\.", ","))
+
+# Creating a column for pH
+pH_regex <-  "[0-9]+\\.*[0-9]*"
+
+# Splitting columns for solvent and solvent description
+ri <- separate(
+  ri,
+  solvent, 
+  c("solvent","solvent_desc"),
+  sep = "(?=\\s*\\()", 
+  extra = "merge", 
+  fill = "right"
+  )
+ri <- ri %>% 
+  mutate(
+    pH = str_extract(
+      solvent_desc, 
+      "(pH\\s(\\<\\s)*[0-9]+(\\.[0-9]+)*)"),
+    pH_range = str_extract(
+      solvent_desc,
+      "pH\\s[0-9]+\\.[0-9]+\\-[0-9]+(\\.[0-9]+)*")) %>%
+  mutate(pH = ifelse(!is.na(pH_range), NA, pH)) %>%
+  mutate(pH = as.numeric(str_extract(pH, pH_regex))) %>%
+  separate(., pH_range, c("pH1", "pH2"), sep = "-") %>%
+  mutate(
+    pH1 = as.numeric(
+      str_extract(pH1, pattern = pH_regex)),
+    pH2 = as.numeric(
+      str_extract(pH2, pattern = pH_regex))) %>%
+  mutate(pH = ifelse(!is.na(pH1), (pH1 + pH2)/2, pH)) %>%
+  mutate(pH = ifelse(is.na(pH), 7.0, pH)) %>%
+  select(-pH1, -pH2) 
+
+
+# Cleaning for temperature and solvent
+ri <- ri %>%
+  filter(
+    solvent == "H2O", 
+    temp == "298", 
+    6.8 <= pH & pH < 7.5
+  )
+```
+
+### Data reliability
+
+According to the original Rekharsky and Inoue paper, datapoints with the footnote b, c, g, i, j, or m contain data that may be unreliable. These datapoints will be cleaned from the set. This leaves 785 observations.
+
+```{r ri_ref}
+ri <- filter(ri, !str_detect(ref, "b|c|g|i|j|m"))
+```
+
+### Removing salts
+
+Hydrochloride salts will also be removed from the dataset. These are guest ligands that contain `HCl` in the name. This leaves 733 observations. 
+
+```{r ri_salt}
+ri <- filter(ri, !str_detect(guest, "\\sHCl"))
+```
+
+### Cyclodextrin hosts
+
+This study will only examine α-, β-, or γ-cyclodextrin. Other varieties of cyclodextrin will be removed from the dataset. This leaves 638 observations.
+
+```{r ri_cd}
+ri <- filter(ri, str_detect(host, "(alpha)|(beta)|(gamma)"))
+```
+
+```{r ri_cd_cat, echo = F}
+cat(
+  "a-CD observations:", 
+  sum(str_count(ri$host, "alpha")), 
+  "\nb-CD:", 
+  sum(str_count(ri$host, "beta")), 
+  "\nc-CD:", 
+  sum(str_count(ri$host, "gamma")))
+```
+
+### Correcting Gibbs free energy
+
+Estimates of Gibbs free energy containing margins of error (e.g., plus or minus a measure) are cleaned to only contain the central estimate. 
+
+```{r ri_dg}
+ri <- ri %>%
+  mutate(dG = str_remove(dG, "\\s\\±\\s.+")) %>%
+  mutate(dG = as.numeric(dG))
+```
+
+### Saving data
+
+The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`.
+
+```{r ri_save}
+ri %>%
+  select(host, guest, dG) %>%
+  saveRDS("data/clean/ri.RDS")
+```
+

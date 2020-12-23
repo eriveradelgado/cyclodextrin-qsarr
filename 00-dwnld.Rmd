@@ -25,16 +25,16 @@ library(devtools)
 install_github("awqx/qsarr")
 ```
 
-This step also requires the packages `data.table`, `dplyr`, `httr`, `stringr`, `tabulizer`, and `XML`.
+This step requires the packages `data.table`, `dplyr`, `httr`, `stringr`, `tabulizer`, and `XML`.
 
-Raw data will be stored in `data-raw`. Data that has been cast into an R data frame but whose contents are unaltered will be in `data-derived`. 
+Raw data will be stored in `data/raw`. Data that has been cast into an R data frame but whose contents are unaltered will be in `data/derived`. 
 
 ```{r packages, message = F, warning = F, results = "hide"}
 packages <- c("data.table", "dplyr", "httr", "stringr", "tabulizer", "XML")
 # mapply(install.packages, packages)
 lapply(packages, library, character.only = T)
-if (!dir.exists("data-raw")) dir.create("data-raw")
-if (!dir.exists("data-derived")) dir.create("data-derived")
+if (!dir.exists("data/raw")) dir.create("data/raw")
+if (!dir.exists("data/derived")) dir.create("data/derived")
 ```
 
 ## Data source
@@ -55,13 +55,13 @@ ri_list <- readHTMLTable(
   as.data.frame = T,
   stringAsFactors = F
 )
-saveRDS(ri_list, file = "data-raw/ri-list.RDS")
+saveRDS(ri_list, file = "data/raw/ri-list.RDS")
 ```
 
 Many elements of the above list do not contain any information on binding affinity, so we need to select the correct elements of the list. The elements that are part of the table on binding affinity have length 10. 
 
 ```{r ri_index, eval = F}
-ri_list <- readRDS("data-raw/ri-list.RDS")
+ri_list <- readRDS("data/raw/ri-list.RDS")
 ri_index <- ri_list %>% 
   lapply(names) %>% 
   lapply(length) >= 10 %>% 
@@ -83,7 +83,7 @@ ri_df <- ri_list[ri_index] %>%
   mutate(host = str_replace_all(host, "1\u03b1", "alpha")) %>%
   mutate(host = str_replace_all(host, "1\u03b2", "beta")) %>%
   mutate(host = str_replace_all(host, "1\u03b3", "gamma"))
-saveRDS(ri_df, "data-derived/ri-df.RDS")
+saveRDS(ri_df, "data/derived/ri-df.RDS")
 ```
 
 ### Suzuki (2001)
@@ -101,7 +101,7 @@ suzuki_list <-
     as.data.frame = T,
     stringAsFactors = F
   )
-saveRDS(suzuki_list, "data-raw/suzuki-list.RDS")
+saveRDS(suzuki_list, "data/raw/suzuki-list.RDS")
 
 suzuki_index <- suzuki_list %>% 
   lapply(names) %>% 
@@ -135,17 +135,17 @@ suzuki_beta <- suzuki_list[suzuki_index] %>%
   select(host, guest, dG)
 
 suzuki_df <- rbind(suzuki_alpha, suzuki_beta)
-saveRDS(suzuki_df, "data-derived/suzuki-df.RDS")
+saveRDS(suzuki_df, "data/derived/suzuki-df.RDS")
 ```
 
 ### Singh (2015)
 
-The following was provided upon request of the supplementary material for the paper "High-throughput measurement of drug-cyclodextrin kinetic rate constants by small molecule microarray using surface plasmon resonance imaging" by Vikramjeet Singh et al in 2015. The PDF containing the raw data is pre-uploaded in `data-raw`.
+The following was provided upon request of the supplementary material for the paper "High-throughput measurement of drug-cyclodextrin kinetic rate constants by small molecule microarray using surface plasmon resonance imaging" by Vikramjeet Singh et al in 2015. The PDF containing the raw data is pre-uploaded in `data/raw`.
 
 The table only provides Ka values. For consistency with the other two data sources, these will be converted into Gibbs free energy (kJ/mol) with the function `Ka_to_delG`.
 
 ```{r singh, eval = F}
-singh_raw <- extract_tables("data-raw/singh.pdf")
+singh_raw <- extract_tables("data/raw/singh.pdf")
 
 # Ka values are in the first table only
 singh <- data.frame(singh_raw[[1]][-1, 1:4])
@@ -160,5 +160,5 @@ singh <- melt(
   variable.name = "cd",
   value.name = "dG"
 )
-saveRDS(singh, "data-derived/singh-df.RDS")
+saveRDS(singh, "data/derived/singh-df.RDS")
 ```
