@@ -139,7 +139,7 @@ suzuki_df <- rbind(suzuki_alpha, suzuki_beta)
 saveRDS(suzuki_df, "data/derived/suzuki-df.RDS")
 ```
 
-### Singh (2015)
+### Singh et al (2015)
 
 The following was provided upon request of the supplementary material for the paper "High-throughput measurement of drug-cyclodextrin kinetic rate constants by small molecule microarray using surface plasmon resonance imaging" by Vikramjeet Singh et al in 2015. The PDF containing the raw data is pre-uploaded in `data/raw`.
 

@@ -154,9 +154,9 @@ ri %>%
 ```
 
 
-## Suzuki et al dataset
+## Suzuki dataset
 
-The dataset from Suzuki et al (2001) requires less cleaning as the conditions for the experiment are already standardized. The dataset contains three columns:
+The dataset from Suzuki (2001) requires less cleaning as the conditions for the experiment are already standardized. The dataset contains three columns:
 
 - `host`: α-, β-, or γ-cyclodextrin (written as `"alpha", "beta", "gamma"`) 
 - `guest`: the ligand tested in the complex
@@ -177,9 +177,9 @@ suzuki <- suzuki_raw %>%
 saveRDS(suzuki, "data/clean/suzuki.RDS")
 ```
 
-## Singh dataset
+## Singh et al dataset
 
-The Singh (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. Out of 114 observations, 112 are retained. The results will be saved in `data/clean`.
+The Singh et al (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. Out of 114 observations, 112 are retained. The results will be saved in `data/clean`.
 
 ```{r singh_clean}
 singh_raw <- readRDS("data/derived/singh-df.RDS")
