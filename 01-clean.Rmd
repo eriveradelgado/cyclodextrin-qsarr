@@ -1,12 +1,14 @@
 ---
-title: 'Step 1: Cleaning the Data'
+title: '1: Data cleaning'
 author: "Al Xin"
 date: "August 2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+if (!require(pacman)) install.packages("pacman")
+library(pacman)
 ```
 
 ## Overview
@@ -15,19 +17,12 @@ In this step, typos will be removed and the conditions for the experimental data
 
 ## Dependencies
 
-There are several personal functions used throughout this project. They can be found and installed through GitHub using `devtools::install_github`.
+There are several personal functions used throughout this project in the. They can be found and installed through GitHub using `devtools::install_github("awqx/qsarr")`. These functions will not be used in this step. 
 
-```{r qsarr, message = F}
-if (!require("devtools")) install.packages("devtools")
-library(devtools)
-install_github("awqx/qsarr")
-```
-
-Packages needed in this step include `data.table`, `dplyr`, and `stringr`.
+Packages needed in this step include `data.table`, `dplyr`, `stringr`, and `tidyr`.
 
 ```{r packages, message = F, warning = F}
-packages <- c("data.table", "stringr", "tidyverse")
-lapply(packages, library, character.only = T)
+p_load(data.table, dplyr, stringr, tidyr)
 if(!dir.exists("data/clean")) dir.create("data/clean")
 ```
 
@@ -150,7 +145,7 @@ ri <- ri %>%
 
 ### Saving data
 
-The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`.
+The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`. In total, 1367 observations were cleaned to 638 observations.
 
 ```{r ri_save}
 ri %>%
@@ -158,3 +153,38 @@ ri %>%
   saveRDS("data/clean/ri.RDS")
 ```
 
+
+## Suzuki et al dataset
+
+The dataset from Suzuki et al (2001) requires less cleaning as the conditions for the experiment are already standardized. The dataset contains three columns:
+
+- `host`: α-, β-, or γ-cyclodextrin (written as `"alpha", "beta", "gamma"`) 
+- `guest`: the ligand tested in the complex
+- `dG`: the change in Gibbs free energy of the complexation, in kJ/mol
+
+Observations without reported change in Gibbs free energy are removed. Out of 436 original observations, 320 remain after cleaning. The cleaned data will be saved in `data/clean`.
+
+```{r suzuki_clean}
+suzuki_raw <- readRDS("data/derived/suzuki-df.RDS") 
+
+# Replace non-standard hyphen and space
+suzuki <- suzuki_raw %>%
+  mutate(dG = str_replace(dG, "\u2212", "-")) %>%
+  mutate(dG = as.numeric(dG)) %>%
+  mutate(guest = str_replace(guest, "\u2009", " ")) %>%
+  filter(!is.na(dG))
+
+saveRDS(suzuki, "data/clean/suzuki.RDS")
+```
+
+## Singh dataset
+
+The Singh (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. Out of 114 observations, 112 are retained. The results will be saved in `data/clean`.
+
+```{r singh_clean}
+singh_raw <- readRDS("data/derived/singh-df.RDS")
+
+singh <- singh_raw %>% 
+  filter(!is.na(dG)) %>% 
+  saveRDS("data/clean/singh.RDS")
+```
