@@ -23,6 +23,7 @@ There are several personal functions used throughout this project. They can be f
 if (!require("devtools")) install.packages("devtools")
 library(devtools)
 install_github("awqx/qsarr")
+library(qsarr)
 ```
 
 This step requires the packages `data.table`, `dplyr`, `httr`, `stringr`, `tabulizer`, and `XML`.
@@ -159,6 +160,7 @@ singh <- melt(
   measure.vars = c(2:4),
   variable.name = "cd",
   value.name = "dG"
-)
+) %>%
+  rename(host = cd)
 saveRDS(singh, "data/derived/singh-df.RDS")
 ```
