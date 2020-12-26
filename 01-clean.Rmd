@@ -90,9 +90,10 @@ ri <- ri %>%
 
 # Cleaning for temperature and solvent
 ri <- ri %>%
+  mutate(temp = as.numeric(temp)) %>%
   filter(
     solvent == "H2O", 
-    temp == "298", 
+    temp == 298, 
     6.8 <= pH & pH < 7.5
   )
 ```
@@ -107,18 +108,38 @@ ri <- filter(ri, !str_detect(ref, "b|c|g|i|j|m"))
 
 ### Removing salts
 
-Hydrochloride salts will also be removed from the dataset. These are guest ligands that contain `HCl` in the name. This leaves 733 observations. 
+Hydrochloride salts will also be removed from the dataset. These are guest ligands that contain `HCl` in the name. This leaves 719 observations. 
 
 ```{r ri_salt}
-ri <- filter(ri, !str_detect(guest, "\\sHCl"))
+ri <- filter(ri, !str_detect(guest, "HCl$"))
+```
+
+### Gibbs free energy data
+
+Estimates of Gibbs free energy containing margins of error (e.g., plus or minus a measure) are cleaned to only contain the central estimate. 
+
+Any observations with no observation for Gibbs free energy will be removed. 
+
+Additionally, ligands with multiple reprted Gibbs free energy observations will be summarized by the average of the observations. This leaves 569 observations.
+
+```{r ri_dg}
+ri <- ri %>%
+  mutate(dG = str_remove(dG, "\\s\\±\\s.+")) %>%
+  mutate(dG = as.numeric(dG)) %>%
+  group_by(host, guest) %>%
+  summarize(dG = mean(dG))
+
+ri <- filter(ri, !is.na(dG))
 ```
 
 ### Cyclodextrin hosts
 
-This study will only examine α-, β-, or γ-cyclodextrin. Other varieties of cyclodextrin will be removed from the dataset. This leaves 638 observations.
+This study will only examine α-, β-, or γ-cyclodextrin. Other varieties of cyclodextrin will be removed from the dataset. This leaves 477 observations.
 
 ```{r ri_cd}
-ri <- filter(ri, str_detect(host, "(alpha)|(beta)|(gamma)"))
+ri <- filter(
+  ri, 
+  str_detect(host, "(^alpha)|(^beta)|(^gamma)"))
 ```
 
 ```{r ri_cd_cat, echo = F}
@@ -131,19 +152,9 @@ cat(
   sum(str_count(ri$host, "gamma")))
 ```
 
-### Correcting Gibbs free energy
-
-Estimates of Gibbs free energy containing margins of error (e.g., plus or minus a measure) are cleaned to only contain the central estimate. 
-
-```{r ri_dg}
-ri <- ri %>%
-  mutate(dG = str_remove(dG, "\\s\\±\\s.+")) %>%
-  mutate(dG = as.numeric(dG))
-```
-
 ### Saving data
 
-The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`. In total, 1367 observations were cleaned to 638 observations.
+The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`. In total, 1367 observations were cleaned to 478 observations.
 
 ```{r ri_save}
 ri %>%
@@ -162,26 +173,23 @@ The dataset from Suzuki (2001) requires less cleaning as the conditions for the 
 Observations without reported change in Gibbs free energy are removed. Out of 436 original observations, 320 remain after cleaning. The cleaned data will be saved in `data/clean`.
 
 ```{r suzuki_clean}
-suzuki_df <- readRDS("data/derived/suzuki-df.RDS") 
-
 # Replace non-standard hyphen and space
-suzuki <- suzuki_df %>%
+readRDS("data/derived/suzuki-df.RDS") %>%
   mutate(dG = str_replace(dG, "\u2212", "-")) %>%
   mutate(dG = as.numeric(dG)) %>%
   mutate(guest = str_replace(guest, "\u2009", " ")) %>%
-  filter(!is.na(dG))
-
-saveRDS(suzuki, "data/clean/suzuki.RDS")
+  filter(!is.na(dG)) %>%
+  saveRDS(suzuki, "data/clean/suzuki.RDS")
 ```
 
 ## Singh et al dataset
 
-The Singh et al (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. Out of 114 observations, 112 are retained. The results will be saved in `data/clean`.
+The Singh et al (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. A slight error occurred in the previous step, where the host, which should be all "gamma" was coerced to "alpha" through collision of the factor levels. This can be corrected manually. Additionally, the names of the guest ligands need to be converted to lowercase. Out of 114 observations, 112 are retained. The results will be saved in `data/clean`.
 
 ```{r singh_clean}
-singh_df <- readRDS("data/derived/singh-df.RDS")
-
-singh <- singh_df %>% 
+readRDS("data/derived/singh-df.RDS") %>% 
   filter(!is.na(dG)) %>% 
+  mutate(guest = tolower(guest)) %>%
+  mutate(host = "gamma") %>%
   saveRDS("data/clean/singh.RDS")
 ```
