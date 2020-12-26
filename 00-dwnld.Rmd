@@ -21,8 +21,7 @@ There are several personal functions used throughout this project. They can be f
 
 ```{r qsarr}
 if (!require("devtools")) install.packages("devtools")
-library(devtools)
-install_github("awqx/qsarr")
+devtools::install_github("awqx/qsarr")
 library(qsarr)
 ```
 
