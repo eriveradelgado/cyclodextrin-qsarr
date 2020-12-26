@@ -17,11 +17,13 @@ In this step, typos will be removed and the conditions for the experimental data
 
 ## Dependencies
 
-Packages needed in this step include `data.table`, `dplyr`, `stringr`, and `tidyr`.
+Packages needed in this step include `data.table`, `dplyr`, `stringr`, and `tidyr`. Additionally, a personal function from `qsarr` for regular expressions is also used. 
 
 ```{r packages, message = F, warning = F}
 p_load(data.table, dplyr, stringr, tidyr)
 if(!dir.exists("data/clean")) dir.create("data/clean")
+devtools::install_github("awqx/qsarr")
+library(qsarr)
 ```
 
 ## Rekharsky and Inoue dataset
@@ -152,6 +154,43 @@ cat(
   sum(str_count(ri$host, "gamma")))
 ```
 
+### Name correction 
+
+There are ligands that contain a description of whether the ligand is an anion, monoanion, or dianion. These descriptions must be removed before passing the names into the search engine in `02-sdf.Rmd`.
+
+```{r ri_ion}
+ri <- mutate(
+  ri, 
+  guest = str_remove(
+    guest, 
+    "\\(anion\\)|\\(monoanion\\)|\\(dianion\\)"))
+```
+
+Additionally, some ligands have typos that can only be corrected through manual replacement. The file containing these replacements is `ligand_name.csv`. The replacements must be converted into regular expressions for `str_replace`. 
+
+```{r ri_replace}
+ri_replace <- read.csv("ligand_name.csv", header = T) %>%
+  mutate(
+    pattern = as.character(pattern), 
+    replacement = as.character(replacement)) %>%
+  mutate(
+    pattern = paste0(make_regex(pattern), "$"), 
+    replacement = make_regex(replacement)
+  )
+```
+
+The incorrect names can be iteratively replaced. A `for` loop is used here instead of `mapply` because the argument for replacement needs to be the result of the last function call. 
+
+```{r ri_replace_df}
+for (i in 1:nrow(ri_replace)) {
+  ri$guest <- str_replace(
+    ri$guest, 
+    pattern = ri_replace[i, 1], 
+    replacement = ri_replace[i, 2]
+  )
+}
+```
+
 ### Saving data
 
 The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`. In total, 1367 observations were cleaned to 478 observations.
@@ -159,6 +198,7 @@ The relevant columns for later steps are `host`, `guest`, and `dG`. These will b
 ```{r ri_save}
 ri %>%
   select(host, guest, dG) %>%
+  data.frame() %>%
   saveRDS("data/clean/ri.RDS")
 ```
 
@@ -193,3 +233,20 @@ readRDS("data/derived/singh-df.RDS") %>%
   mutate(host = "gamma") %>%
   saveRDS("data/clean/singh.RDS")
 ```
+
+## Combined dataset
+
+The data from all three sources are also compiled into a single data frame. For repeated observations (same host and guest), the average change in Gibbs free energy is reported. The compiled data will be abreviated as `riss`.
+
+There are 909 observations between the three data sets. Taking the average Gibbs free energy summarizes this to 766 observations.
+
+```{r riss}
+ri <- readRDS("data/clean/ri.RDS")
+suzuki <- readRDS("data/clean/suzuki.RDS")
+singh <- readRDS("data/clean/singh.RDS")
+riss <- rbind(ri, suzuki, singh) %>%
+  group_by(guest, host) %>%
+  summarize(dG = mean(dG))
+saveRDS(riss, "data/clean/riss.RDS")
+```
+
