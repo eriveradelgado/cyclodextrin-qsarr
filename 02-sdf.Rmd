@@ -1,0 +1,184 @@
+---
+title: '2: Downloading ligand structures as SDFs'
+author: "Al Xin"
+date: "12/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+The 3d structures of molecules can be downloaded as structure data files (SDFs) from the Chemical Identifier Resolver, a tool provided by the CADD group of the NCI. The URL is https://cactus.nci.nih.gov/chemical/structure
+
+### Data organization
+
+The downloaded SDFs will be in the directory `sdf`. Each data source will have its own subdirectory. All ligands will be compiled in the subdirectory `sdf/all`. Additionally, these subdirectories will be further divided by cyclodextrin type.
+
+```{r dir}
+cd_list <- c("alpha", "beta", "gamma")
+df_list <- c("ri", "suzuki", "singh", "riss")
+dir_list1 <- paste0("sdf/", df_list)
+dir_list2 <- paste0(
+  dir_list1, "/", 
+  unlist(lapply(cd_list, rep, 4)))
+
+if (!dir.exists("sdf")) {
+  dir.create("sdf")
+  lapply(dir_list1, dir.create)
+  lapply(dir_list2, dir.create)
+  dir.create("sdf/result")
+}
+```
+
+Results from the downloads will be stored in `sdf/result`.
+
+## Dependencies
+
+There are several new functions used throughout this project. They can be found and installed through GitHub using `devtools::install_github`. Additionally, `dplyr` and `stringr` will be used here.
+
+```{r dependencies, message = F}
+library(devtools)
+devtools::install_github("awqx/qsarr")
+library(qsarr)
+library(dplyr)
+library(stringr)
+```
+
+### Timing
+
+This is not necessary for the code to run, but to time the downloading, the library `tictoc` can be used.
+
+```{r dependency_tictoc, eval = F}
+install.packages("tictoc")
+```
+
+## Loading cleaned data
+
+The cleaned data from the previous step is loaded to obtain the names of the ligands. 
+
+```{r load_data, message = F}
+ri <- readRDS("data/clean/ri.RDS")
+suzuki <- readRDS("data/clean/suzuki.RDS")
+singh <- readRDS("data/clean/singh.RDS")
+riss <- readRDS("data/clean/riss.RDS")
+```
+
+## Rekharsky and Inoue
+
+### SDF Download
+
+The function `dwnld_mol_list` from `qsarr` will query NCI's database for molecules by name and download them into the indicated directory. The function output is a data frame indicating the status of the download. It is integrated in the function `dwnld_ligand` for better compatability with the data set.
+
+Due to some output inconsistencies with  data frames, the function iterates using a `for` loop and not the `apply` family of functions. 
+
+All 477 observations were succesfully downloaded. The download required 1198.11 seconds, or 19 minutes and 58.11 seconds.
+
+```{r dwnld_ligand}
+dwnld_ligand <- function(cd, p, df, ff) {
+  dwnld_list <- list()
+  if (length(cd) != length(p)) {
+    message("Cyclodextrin list and list of directories are not equal")
+    return(0)
+  }
+  for(i in 1:length(cd)) {
+    guest <- filter(df, host == cd[i])$guest
+    dwnld_list[[i]] <- dwnld_mol_list(
+      mol_list = guest, 
+      path = p[i], 
+      file_format = ff
+    ) %>% as_tibble()
+  }
+  dwnld_list <- Map(
+    function(x, df) {
+      mutate(df, host = x)
+    }, 
+    cd_list, 
+    dwnld_list
+  )
+  do.call(rbind, dwnld_list)
+}
+```
+
+```{r ri_dwnld, eval = F}
+ri_dir_list <- dir_list2[str_detect(dir_list2, "ri/")]
+if(require(tictoc)) tic()
+ri_dwnld <- dwnld_ligand(cd_list, ri_dir_list, ri, "sdf")
+if(require(tictoc)) toc()
+saveRDS(ri_dwnld, "sdf/result/ri_dwnld.RDS")
+```
+
+```{r ri_dwnld_summary, echo = F}
+ri_dwnld <- readRDS("sdf/result/ri_dwnld.RDS")
+cat(
+  "Successful downloads:", sum(ri_dwnld$downloaded), 
+  "\nWarnings:", sum(ri_dwnld$warning), 
+  "\nErrors:", sum(ri_dwnld$error)
+)
+```
+
+## Suzuki
+
+The Suzuki dataset only contains observations for α- and β- cyclodextrin. All 320 observations were successfully downloaded. The download required 250.58 seconds, or 4 minutes and 10.58 seconds. 
+
+```{r suzuki_dwnld, eval = F}
+suzuki_dir_list <- dir_list2[str_detect(dir_list2, "suzuki")]
+if(require(tictoc)) tic()
+suzuki_dwnld <- dwnld_ligand(cd_list, suzuki_dir_list, suzuki, "sdf")
+if(require(tictoc)) toc()
+saveRDS(suzuki_dwnld, "sdf/result/suzuki_dwnld.RDS")
+```
+
+```{r suzuki_dwnld_summary, echo = F}
+suzuki_dwnld <- readRDS("sdf/result/suzuki_dwnld.RDS")
+cat(
+  "Successful downloads:", sum(suzuki_dwnld$downloaded), "\n",
+  "Warnings:", sum(suzuki_dwnld$warning), "\n",
+  "Errors:", sum(suzuki_dwnld$error)
+)
+```
+
+## Singh
+
+The Singh data only contains observations for γ-cyclodextrin. The names of the guest molecules need to be all lowercase to be properly queried. All 112 observations were successfully downloaded. The download required 105.31 seconds, or 1 minute and 45.31 seconds. 
+
+```{r singh_dwnld, eval = F}
+singh <- mutate(singh, guest = tolower(guest))
+singh_dir_list <- dir_list2[str_detect(dir_list2, "singh")]
+if(require(tictoc)) tic()
+singh_dwnld <- dwnld_ligand(cd_list, singh_dir_list, singh, "sdf")
+if(require(tictoc)) toc()
+saveRDS(singh_dwnld, "sdf/result/singh_dwnld.RDS")
+```
+
+```{r singh_dwnld_summary, echo = F}
+singh_dwnld <- readRDS("sdf/result/singh_dwnld.RDS")
+cat(
+  "Successful downloads:", sum(singh_dwnld$downloaded), "\n",
+  "Warnings:", sum(singh_dwnld$warning), "\n",
+  "Errors:", sum(singh_dwnld$error)
+)
+```
+
+## Compiled data
+
+The compiled data (RISS) contains observations for all three cyclodextrin types. All 766 observations were successfully downloaded. The download took 610.64 seconds, or 10 minutes and 10.64 seconds.
+
+```{r riss_dwnld, eval = F}
+riss_dir_list <- dir_list2[str_detect(dir_list2, "riss/")]
+if(require(tictoc)) tic()
+riss_dwnld <- dwnld_ligand(cd_list, riss_dir_list, riss, "sdf")
+if(require(tictoc)) toc()
+saveRDS(riss_dwnld, "sdf/result/riss_dwnld.RDS")
+```
+
+```{r riss_dwnld_summary, echo = F}
+riss_dwnld <- readRDS("sdf/result/riss_dwnld.RDS")
+cat(
+  "Successful downloads:", sum(riss_dwnld$downloaded), "\n",
+  "Warnings:", sum(riss_dwnld$warning), "\n",
+  "Errors:", sum(riss_dwnld$error)
+)
+```

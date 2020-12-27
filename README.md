@@ -22,6 +22,17 @@ Overall, the workflow can be followed by running the R Markdown files in order. 
 - Removed special or unconventional characters
 - Cleaned by solvent conditions
 - Rekharsky and Inoue data required most cleaning as it comes from multiple compiled sources
+  - Additional cleaning is necessary in order to pass the data to `02-sdf.Rmd`
+  - Typos in chemical names corrected
+
+### 02-sdf.Rmd
+
+- Structure data files (SDFs) downloaded into `sdf/`
+  - Subdirectories for each data source
+  - Additional subdirectory for compiled data from each source
+- Queried Chemical Identifier Resolver from NCI https://cactus.nci.nih.gov/chemical/structure
+- All observations successfully downloaded
+- The directory is not uploaded onto GitHub for convenience
 
 ## Acknowledgements
 
