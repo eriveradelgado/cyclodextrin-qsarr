@@ -90,10 +90,11 @@ desc_df <- Map(
 )
 ```
 
-We can then save the data frames of descriptors in `desc`. 
+We can then save the data frames of descriptors in `desc/cdk`. The descriptors are saved in a subfolder because we may incorporate other descriptor sources later (e.g., PaDEL-descriptor) 
 
 ```{r save_desc}
-desc_name <- paste0("desc/", names(desc_df), ".RDS")
+if (!dir.exists("desc/cdk")) dir.create("desc/cdk")
+desc_name <- paste0("desc/cdk/", names(desc_df), ".RDS")
 save_result <- mapply(
   function(x, y) saveRDS(x, y), 
   x = desc_df, 
