@@ -23,7 +23,7 @@ if (!dir.exists("desc")) dir.create("desc")
 
 ## Dependencies
 
-The package `rcdk` is required hered. This will automatically load `rJava` as well. 
+The package `rcdk` is required here. This will automatically load `rJava` as well. 
 
 ```{r pkg, message = F, eval = T}
 if (!require("rcdk")) {

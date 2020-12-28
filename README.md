@@ -42,11 +42,25 @@ File: `02-sdf.Rmd`
 - The directories of individual SDFs is not uploaded onto GitHub for convenience
   - Combined SDF file is backed up in GitHub
 
-### 03.Calculating chemical descriptors using CDK for R
+### 03. Calculating chemical descriptors using CDK for R
 
 File: `03-cdk.Rmd`
 
 - Using package `rcdk` to obtain chemical descriptors
+  - https://cran.r-project.org/web/packages/rcdk/vignettes/using-rcdk.html
+- Calculates 281 descriptors for each molecule
+- Does not calculate 3D descriptors
+  - 3D descriptors may not be reliable due to lack of optimization
+
+### 04. 04. Other sources for chemical descriptors
+
+File: `04-desc_external.Rmd
+
+- Incorporation of descriptors from other sources
+- PaDEL-Descriptor
+  - http://yapcwsoft.com/dd/padeldescriptor/
+- Online chemical database with modeling environment
+  - https://ochem.eu
 
 ## Acknowledgements
 
