@@ -1,0 +1,102 @@
+---
+title: '03. Calculating chemical descriptors using CDK for R'
+author: "Al Xin"
+date: "12/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = F)
+```
+
+## Overview
+
+The package `rcdk` links the Java library CDK (Chemistry Development Kit) to R. The CDK will be used for generating chemical descriptors for QSAR building.
+
+### Data organization 
+
+Descriptors will be saved in the directory `desc`. File names will be symmetric with file names for combined SDFs, 
+
+```{r desc_dir, message = F, eval = T}
+if (!dir.exists("desc")) dir.create("desc")
+```
+
+## Dependencies
+
+The package `rcdk` is required hered. This will automatically load `rJava` as well. 
+
+```{r pkg, message = F, eval = T}
+if (!require("rcdk")) {
+  install.packages("rcdk")
+  library(rcdk)
+}
+```
+
+## Loading molecules
+
+Recall that the combiend SDFs are in the directory `sdf/combined`. Using `rcdk::load.molecules` we can create `jobjRef` objects (provided by `rJava`) for use with CDK.
+
+We will then subset the elements of the list according to the data source. 
+
+```{r load_mol}
+sdf_file <- list.files("sdf/combined", full.names = T)
+sdf_name <- list.files("sdf/combined") %>%
+  str_remove("\\.(?i)sdf$")
+
+# Creating a list of objects with rJava
+# Names correspond to the combined SDF names
+mol_list <- lapply(
+  sdf_file, 
+  load.molecules
+)
+names(mol_list) <- sdf_name
+```
+
+## Chemical descriptors
+
+`rcdk` provides a list of all descriptor categories through `get.desc.categories()`. There is no single category for all descriptors. To evaluate all available descriptors, we have to unlist and combine the unique descriptors from the available categories. 
+
+Evaluation of descriptors will irreversibly fail with BCUT descriptors, which correspond to eigenvalues of the adjacency matrix of the molecules, described at https://vcclab.org/lab/indexhlp/bcutdes.html. As a result, BCUT descriptors, corresponding to index 2 in the descriptor list, are removed from evaluation. 
+
+```{r all_desc}
+all_desc <- unique(
+  unlist(
+    sapply(
+      get.desc.categories(), 
+      get.desc.names
+    )
+  )
+)
+all_desc <- all_desc[-2]
+```
+
+We can then evaluate the descriptors using `eval.desc`. If a descriptor cannot be calculated, a `NA` or `NaN` will be returned.
+
+The descriptors are returned as a data frame of descriptors. This process removes the names of the molecules and they have to be replaced using `get.title`. 
+
+```{r eval_desc}
+desc <- lapply(
+  mol_list, 
+  eval.desc, 
+  which.desc = all_desc
+)
+
+mol_name <- lapply(mol_list, function(x) sapply(x, get.title))
+
+desc_df <- Map(
+  function(x, y) mutate(x, guest = y), 
+  x = desc, 
+  y = mol_name
+)
+```
+
+We can then save the data frames of descriptors in `desc`. 
+
+```{r save_desc}
+desc_name <- paste0("desc/", names(desc_df), ".RDS")
+save_result <- mapply(
+  function(x, y) saveRDS(x, y), 
+  x = desc_df, 
+  y = desc_name
+)
+```
