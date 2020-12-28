@@ -6,9 +6,11 @@ This repository will detail the process of creating and comparing QSARs that pre
 
 Overall, the workflow can be followed by running the R Markdown files in order. However, the "zeroth" file, `00-dwnld.Rmd`, can be skipped. This is the least important file for reproducibility and the data generated is already loaded in the repository. Additionally, loading the file is likely to be difficult without an academic VPN or academic credentials to download the data. 
 
-## File descriptions
+## Steps
 
-### 00-dwnld.Rmd
+### 00. Downloading experimental observations
+
+File: `00-dwnld.Rmd`
 
 - Downloads data from Rekharsky and Inoue (1997), Suzuki (2001), and Singh et al (2015)
 - Converted Singh data from constant of association to Gibbs free energy change
@@ -17,7 +19,9 @@ Overall, the workflow can be followed by running the R Markdown files in order. 
 - Cyclodextrin is categorized as "alpha", "beta", "gamma" rather than by Greek letter
 - Raw data is stored in `data/raw`, derived data is stored in `data/derived`
 
-### 01-clean.Rmd
+### 01. Cleaning experimental observations
+
+File: `01-clean.Rmd`
 
 - Removed special or unconventional characters
 - Cleaned by solvent conditions
@@ -25,7 +29,9 @@ Overall, the workflow can be followed by running the R Markdown files in order. 
   - Additional cleaning is necessary in order to pass the data to `02-sdf.Rmd`
   - Typos in chemical names corrected
 
-### 02-sdf.Rmd
+### 02. Downloading ligand structures as SDFs
+
+File: `02-sdf.Rmd`
 
 - Structure data files (SDFs) downloaded into `sdf/`
   - Subdirectories for each data source
@@ -35,6 +41,12 @@ Overall, the workflow can be followed by running the R Markdown files in order. 
 - Observations compiled into single SDFs
 - The directories of individual SDFs is not uploaded onto GitHub for convenience
   - Combined SDF file is backed up in GitHub
+
+### 03.Calculating chemical descriptors using CDK for R
+
+File: `03-cdk.Rmd`
+
+- Using package `rcdk` to obtain chemical descriptors
 
 ## Acknowledgements
 
