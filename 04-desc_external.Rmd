@@ -1,0 +1,61 @@
+---
+title: "04. Other sources for chemical descriptors"
+author: "Al Xin"
+date: "12/28/2020"
+output: html_document
+---
+
+## Overview
+
+Outside of `rcdk`, there are other methods of obtaining chemical descriptors. 
+
+All methods tested are relatively simple to run (straightforward installation and running with minimal tuning) and open for public use
+
+Outside of CDK for R, other descriptors to consider are those from the Online chemical database, Mordred, and PaDEL-Descriptor. 
+
+## Online chemical database
+
+### Preprocessing settings
+
+All options were selected, including standardization, neutralization, removal of salts, and structure cleaning. These steps are processed by Chemaxon.
+
+### Molecular descriptors
+
+Only **alvaDesc** was selected for molecular descriptor calculation. This package is not easily accessible otherwise. It provides a combination of 2D and 3D descriptors. Additionally, in terms of usage, it is more convenient to only have to select one descriptor package to calculate. This package provides more than 5000 chemical descriptors.  
+
+### Optimization
+
+Optimization was performed with Corina.
+
+### Data export
+
+Only DESCRIPTORS were selected for export. Unfortunately, the names of the molecules cannot be written and have to be replaced later. The data was exported as an Excel file to prevent problems with the commas in the names of molecules. 
+
+## Mordred
+
+### Setup
+
+These steps may differ based on OS and previous installations.
+
+Mordred is available as a web-based interface and a command-line interface. I opted to first try Mordred Web as it would likely be most approachable to other users.  
+
+Mordred and Mordred Web require `rdkit`, which can be handled with Anaconda. I installed the 64-bit version of Anaconda for Windows and followed the steps outlined for activation of an RDKit environment. 
+
+- Downloading Anaconda: https://conda.io/projects/conda/en/latest/user-guide/install/windows.html
+- RDKit: https://github.com/rdkit/rdkit/blob/master/Docs/Book/Install.md
+- Mordred Web: https://github.com/mordred-descriptor/mordred-web
+
+#### Dependencies
+
+In the process of downloading `mordred-web`, I also needed to load additional dependencies that were not covered by the installation by default. This included `pip install openpyxl`.
+
+Additionally, when downloading `mordred`, I needed to load the additional module `nose` to run the tests.
+
+### Troubleshooting
+
+When running Mordred Web, an irreversible error occurs when attempting to parse the file. It appears a temporary file is created that cannot be handled by the system. 
+
+Additionally, there is a persistent error for molecules that `module 'networkx' has no attribute 'biconnected_component_subgraphs'`. This doesn't affect the calculation of the remaining descriptors. Using an older version of `networkx` results in an error with importing `gcd` from `fractions`. It is likely better to ignore the error for now. 
+
+## PaDEL-Descriptor
+
