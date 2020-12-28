@@ -224,3 +224,35 @@ mapply(
 )
 ```
 
+### Removing names
+
+Certain names in the SDFs may be problematic later due to non-ASCII characters or commas. A separate directory of molecules without names will be created to address this (`sdf/no_name`). The names will be stored as an RDS file in this directory. 
+
+```{r combine_noname}
+if (!dir.exists("sdf/no_name")) dir.create("sdf/no_name")
+
+# Recall that dir_list2 holds the directories for where
+# all the SDFs are saved
+sdf_noname <- lapply(
+  dir_list2, 
+  combine_sdf, 
+  rm_name = T
+)
+
+# Retain appropriate file names and convert them into files
+sdf_file <- dir_list2[which(is.na(as.logical(sdf_noname)))] %>%
+  str_remove("sdf/") %>%
+  str_replace("/", "_") %>%
+  paste0("sdf/no_name/", .)
+
+# Remove zero-length elements of the list
+sdf_noname <- sdf_noname[which(is.na(as.logical(sdf_noname)))]
+
+# Save the SDF files
+mapply(
+  write_sdf, 
+  sdf = sdf_noname, 
+  path = sdf_file
+)
+```
+
