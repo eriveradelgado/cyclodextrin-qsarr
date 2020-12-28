@@ -32,7 +32,9 @@ Overall, the workflow can be followed by running the R Markdown files in order. 
   - Additional subdirectory for compiled data from each source
 - Queried Chemical Identifier Resolver from NCI https://cactus.nci.nih.gov/chemical/structure
 - All observations successfully downloaded
-- The directory is not uploaded onto GitHub for convenience
+- Observations compiled into single SDFs
+- The directories of individual SDFs is not uploaded onto GitHub for convenience
+  - Combined SDF file is backed up in GitHub
 
 ## Acknowledgements
 

@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = T, eval = F)
 ```
 
 ## Overview
@@ -17,7 +17,7 @@ The 3d structures of molecules can be downloaded as structure data files (SDFs) 
 
 The downloaded SDFs will be in the directory `sdf`. Each data source will have its own subdirectory. All ligands will be compiled in the subdirectory `sdf/all`. Additionally, these subdirectories will be further divided by cyclodextrin type.
 
-```{r dir}
+```{r dir, eval = T}
 cd_list <- c("alpha", "beta", "gamma")
 df_list <- c("ri", "suzuki", "singh", "riss")
 dir_list1 <- paste0("sdf/", df_list)
@@ -28,8 +28,11 @@ dir_list2 <- paste0(
 if (!dir.exists("sdf")) {
   dir.create("sdf")
   lapply(dir_list1, dir.create)
-  lapply(dir_list2, dir.create)
   dir.create("sdf/result")
+}
+
+if (!dir.exists(dir_list2[1])) {
+  lapply(dir_list2, dir.create)
 }
 ```
 
@@ -39,9 +42,15 @@ Results from the downloads will be stored in `sdf/result`.
 
 There are several new functions used throughout this project. They can be found and installed through GitHub using `devtools::install_github`. Additionally, `dplyr` and `stringr` will be used here.
 
-```{r dependencies, message = F}
-library(devtools)
-devtools::install_github("awqx/qsarr")
+```{r dependencies, message = F, eval = T}
+if (!require("qsarr")) {
+ devtools::install_github(
+  "awqx/qsarr", 
+  upgrade = "never", 
+  quiet = T
+  ) 
+}
+
 library(qsarr)
 library(dplyr)
 library(stringr)
@@ -51,8 +60,9 @@ library(stringr)
 
 This is not necessary for the code to run, but to time the downloading, the library `tictoc` can be used.
 
-```{r dependency_tictoc, eval = F}
+```{r dependency_tictoc}
 install.packages("tictoc")
+library(tictoc)
 ```
 
 ## Loading cleaned data
@@ -110,7 +120,7 @@ if(require(tictoc)) toc()
 saveRDS(ri_dwnld, "sdf/result/ri_dwnld.RDS")
 ```
 
-```{r ri_dwnld_summary, echo = F}
+```{r ri_dwnld_summary, echo = F, eval = T}
 ri_dwnld <- readRDS("sdf/result/ri_dwnld.RDS")
 cat(
   "Successful downloads:", sum(ri_dwnld$downloaded), 
@@ -131,7 +141,7 @@ if(require(tictoc)) toc()
 saveRDS(suzuki_dwnld, "sdf/result/suzuki_dwnld.RDS")
 ```
 
-```{r suzuki_dwnld_summary, echo = F}
+```{r suzuki_dwnld_summary, echo = F, eval = T}
 suzuki_dwnld <- readRDS("sdf/result/suzuki_dwnld.RDS")
 cat(
   "Successful downloads:", sum(suzuki_dwnld$downloaded), "\n",
@@ -153,7 +163,7 @@ if(require(tictoc)) toc()
 saveRDS(singh_dwnld, "sdf/result/singh_dwnld.RDS")
 ```
 
-```{r singh_dwnld_summary, echo = F}
+```{r singh_dwnld_summary, echo = F, eval = T}
 singh_dwnld <- readRDS("sdf/result/singh_dwnld.RDS")
 cat(
   "Successful downloads:", sum(singh_dwnld$downloaded), "\n",
@@ -166,7 +176,7 @@ cat(
 
 The compiled data (RISS) contains observations for all three cyclodextrin types. All 766 observations were successfully downloaded. The download took 610.64 seconds, or 10 minutes and 10.64 seconds.
 
-```{r riss_dwnld, eval = F}
+```{r riss_dwnld}
 riss_dir_list <- dir_list2[str_detect(dir_list2, "riss/")]
 if(require(tictoc)) tic()
 riss_dwnld <- dwnld_ligand(cd_list, riss_dir_list, riss, "sdf")
@@ -174,7 +184,7 @@ if(require(tictoc)) toc()
 saveRDS(riss_dwnld, "sdf/result/riss_dwnld.RDS")
 ```
 
-```{r riss_dwnld_summary, echo = F}
+```{r riss_dwnld_summary, echo = F, eval = T}
 riss_dwnld <- readRDS("sdf/result/riss_dwnld.RDS")
 cat(
   "Successful downloads:", sum(riss_dwnld$downloaded), "\n",
@@ -182,3 +192,35 @@ cat(
   "Errors:", sum(riss_dwnld$error)
 )
 ```
+
+## Combining SDFs
+
+For certain applications, like the `rcdk` package, it is convenient to have SDFs compiled into a single SDF. The functions `qsarr::combine_sdf` and `qsarr::write_sdf` can accomplish this. These files will be saved in `sdf/compiled`.
+
+```{r combine_sdf, eval = T}
+if (!dir.exists("sdf/combined")) dir.create("sdf/combined")
+
+# Recall that dir_list2 holds the directories for where
+# all the SDFs are saved
+sdf_list <- lapply(
+  dir_list2, 
+  combine_sdf
+)
+
+# Retain appropriate file names and convert them into files
+sdf_file <- dir_list2[which(is.na(as.logical(sdf_list)))] %>%
+  str_remove("sdf/") %>%
+  str_replace("/", "_") %>%
+  paste0("sdf/combined/", .)
+
+# Remove zero-length elements of the list
+sdf_list <- sdf_list[which(is.na(as.logical(sdf_list)))]
+
+# Save the SDF files
+mapply(
+  write_sdf, 
+  sdf = sdf_list, 
+  path = sdf_file
+)
+```
+
