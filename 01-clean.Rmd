@@ -13,7 +13,7 @@ library(pacman)
 
 ## Overview
 
-In this step, typos will be removed and the conditions for the experimental data will be standardized (298 K, water as a solvent, neutral pH, etc.) The cleaned data will be stored in the directory `data/clean`.
+In this step, typos will be removed and the conditions for the experimental data will be standardized (298 K, water as a solvent, neutral pH, etc.) The cleaned data will be stored in the directory `affinity/clean`.
 
 ## Dependencies
 
@@ -21,7 +21,7 @@ Packages needed in this step include `data.table`, `dplyr`, `stringr`, and `tidy
 
 ```{r packages, message = F, warning = F}
 p_load(data.table, dplyr, stringr, tidyr)
-if(!dir.exists("data/clean")) dir.create("data/clean")
+if(!dir.exists("affinity/clean")) dir.create("affinity/clean")
 devtools::install_github("awqx/qsarr")
 library(qsarr)
 ```
@@ -44,7 +44,7 @@ The original dataset contains 1367 observations. After cleaning for solvent cond
 
 ```{r ri_solvent}
 # Reading the data from the previous step
-ri_df <- readRDS("data/derived/ri-df.RDS")
+ri_df <- readRDS("affinity/derived/ri-df.RDS")
 
 # Removing unusual separators and spaces
 ri <- ri_df %>%
@@ -193,13 +193,13 @@ for (i in 1:nrow(ri_replace)) {
 
 ### Saving data
 
-The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `data/clean`. In total, 1367 observations were cleaned to 478 observations.
+The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `affinity/clean`. In total, 1367 observations were cleaned to 478 observations.
 
 ```{r ri_save}
 ri %>%
   select(host, guest, dG) %>%
   data.frame() %>%
-  saveRDS("data/clean/ri.RDS")
+  saveRDS("affinity/clean/ri.RDS")
 ```
 
 ## Suzuki dataset
@@ -210,28 +210,28 @@ The dataset from Suzuki (2001) requires less cleaning as the conditions for the 
 - `guest`: the ligand tested in the complex
 - `dG`: the change in Gibbs free energy of the complexation, in kJ/mol
 
-Observations without reported change in Gibbs free energy are removed. Out of 436 original observations, 320 remain after cleaning. The cleaned data will be saved in `data/clean`.
+Observations without reported change in Gibbs free energy are removed. Out of 436 original observations, 320 remain after cleaning. The cleaned data will be saved in `affinity/clean`.
 
 ```{r suzuki_clean}
 # Replace non-standard hyphen and space
-readRDS("data/derived/suzuki-df.RDS") %>%
+readRDS("affinity/derived/suzuki-df.RDS") %>%
   mutate(dG = str_replace(dG, "\u2212", "-")) %>%
   mutate(dG = as.numeric(dG)) %>%
   mutate(guest = str_replace(guest, "\u2009", " ")) %>%
   filter(!is.na(dG)) %>%
-  saveRDS(suzuki, "data/clean/suzuki.RDS")
+  saveRDS(suzuki, "affinity/clean/suzuki.RDS")
 ```
 
 ## Singh et al dataset
 
-The Singh et al (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. A slight error occurred in the previous step, where the host, which should be all "gamma" was coerced to "alpha" through collision of the factor levels. This can be corrected manually. Additionally, the names of the guest ligands need to be converted to lowercase. Out of 114 observations, 112 are retained. The results will be saved in `data/clean`.
+The Singh et al (2015) dataset, like the Suzuki information, is largely cleaned and only needs to be filtered for reported Gibbs free energy change. A slight error occurred in the previous step, where the host, which should be all "gamma" was coerced to "alpha" through collision of the factor levels. This can be corrected manually. Additionally, the names of the guest ligands need to be converted to lowercase. Out of 114 observations, 112 are retained. The results will be saved in `affinity/clean`.
 
 ```{r singh_clean}
-readRDS("data/derived/singh-df.RDS") %>% 
+readRDS("affinity/derived/singh-df.RDS") %>% 
   filter(!is.na(dG)) %>% 
   mutate(guest = tolower(guest)) %>%
   mutate(host = "gamma") %>%
-  saveRDS("data/clean/singh.RDS")
+  saveRDS("affinity/clean/singh.RDS")
 ```
 
 ## Combined dataset
@@ -241,12 +241,12 @@ The data from all three sources are also compiled into a single data frame. For 
 There are 909 observations between the three data sets. Taking the average Gibbs free energy summarizes this to 766 observations.
 
 ```{r riss}
-ri <- readRDS("data/clean/ri.RDS")
-suzuki <- readRDS("data/clean/suzuki.RDS")
-singh <- readRDS("data/clean/singh.RDS")
+ri <- readRDS("affinity/clean/ri.RDS")
+suzuki <- readRDS("affinity/clean/suzuki.RDS")
+singh <- readRDS("affinity/clean/singh.RDS")
 riss <- rbind(ri, suzuki, singh) %>%
   group_by(guest, host) %>%
   summarize(dG = mean(dG))
-saveRDS(riss, "data/clean/riss.RDS")
+saveRDS(riss, "affinity/clean/riss.RDS")
 ```
 

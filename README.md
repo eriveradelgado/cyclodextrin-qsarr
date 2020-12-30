@@ -17,7 +17,7 @@ File: `00-dwnld.Rmd`
 - Abbreviated as `ri`, `suzuki`, and `singh`
 - Basic wrangling of data into data frames
 - Cyclodextrin is categorized as "alpha", "beta", "gamma" rather than by Greek letter
-- Raw data is stored in `data/raw`, derived data is stored in `data/derived`
+- Raw data is stored in `affinity/raw`, derived data is stored in `affinity/derived`
 
 ### 01. Cleaning experimental observations
 
@@ -54,7 +54,7 @@ File: `03-cdk.Rmd`
 
 ### 04. Other sources for chemical descriptors
 
-File: `04-desc_external.Rmd
+File: `04-desc_external.Rmd`
 
 - Incorporation of descriptors from other sources
 - PaDEL-Descriptor
@@ -76,7 +76,12 @@ File: `05-extval.Rmd`
 
 File: `06-preprocess.Rmd`
 
-
+- Common preprocessing functions applied to data
+  - Centering and scaling
+  - Removal of variables with near zero variance
+  - Removal of molecules with large amounts of missing data
+- If more than 5% of the chemical descriptors of a molecule are `NA` or `NaN`, the molecule is removed from the data. Otherwise, the descriptors are filled in using a simple mean.
+- These steps are performed on the data saved in `trn`
 
 ## Acknowledgements
 

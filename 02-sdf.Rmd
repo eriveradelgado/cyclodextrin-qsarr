@@ -70,10 +70,10 @@ library(tictoc)
 The cleaned data from the previous step is loaded to obtain the names of the ligands. 
 
 ```{r load_data, message = F}
-ri <- readRDS("data/clean/ri.RDS")
-suzuki <- readRDS("data/clean/suzuki.RDS")
-singh <- readRDS("data/clean/singh.RDS")
-riss <- readRDS("data/clean/riss.RDS")
+ri <- readRDS("affinity/clean/ri.RDS")
+suzuki <- readRDS("affinity/clean/suzuki.RDS")
+singh <- readRDS("affinity/clean/singh.RDS")
+riss <- readRDS("affinity/clean/riss.RDS")
 ```
 
 ## Rekharsky and Inoue
