@@ -52,7 +52,7 @@ File: `03-cdk.Rmd`
 - Does not calculate 3D descriptors
   - 3D descriptors may not be reliable due to lack of optimization
 
-### 04. 04. Other sources for chemical descriptors
+### 04. Other sources for chemical descriptors
 
 File: `04-desc_external.Rmd
 
@@ -61,6 +61,8 @@ File: `04-desc_external.Rmd
   - http://yapcwsoft.com/dd/padeldescriptor/
 - Online chemical database with modeling environment
   - https://ochem.eu
+- Mordred
+  - https://github.com/mordred-descriptor/mordred
 
 ## Acknowledgements
 

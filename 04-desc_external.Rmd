@@ -13,7 +13,9 @@ All methods tested are relatively simple to run (straightforward installation an
 
 Outside of CDK for R, other descriptors to consider are those from the Online chemical database, Mordred, and PaDEL-Descriptor. 
 
-## Online chemical database
+## Online chemical database (OCHEM)
+
+The Online Chemical Modeling Environment (OCHEM) is a web-based tool for simplifying steps in creating QSARs. The tool was developed by a team from eADMET GmbH in Germany and can be found at https://ochem.eu/home/show.do.
 
 ### Preprocessing settings
 
@@ -29,7 +31,7 @@ Optimization was performed with Corina.
 
 ### Data export
 
-Only DESCRIPTORS were selected for export. Unfortunately, the names of the molecules cannot be written and have to be replaced later. The data was exported as an Excel file to prevent problems with the commas in the names of molecules. 
+Only DESCRIPTORS were selected for export. Unfortunately, the names of the molecules cannot be written and have to be replaced later. The data was exported as an Excel file to prevent problems with commas in molecule names.
 
 ## Mordred
 
@@ -47,15 +49,49 @@ Mordred and Mordred Web require `rdkit`, which can be handled with Anaconda. I i
 
 #### Dependencies
 
-In the process of downloading `mordred-web`, I also needed to load additional dependencies that were not covered by the installation by default. This included `pip install openpyxl`.
+In the process of downloading `mordred-web`, the module `openpyxl` needs to be installed using `pip install openpyxl`.
 
-Additionally, when downloading `mordred`, I needed to load the additional module `nose` to run the tests.
+Additionally, when downloading `mordred`, the additional module `nose` is required to run the tests.
 
 ### Troubleshooting
 
-When running Mordred Web, an irreversible error occurs when attempting to parse the file. It appears a temporary file is created that cannot be handled by the system. 
+When running Mordred Web, an irreversible error occurs when attempting to parse the file. It appears a temporary file is created that cannot be handled by the system. This occurs with Mozilla Firefox on Windows 10.
 
 Additionally, there is a persistent error for molecules that `module 'networkx' has no attribute 'biconnected_component_subgraphs'`. This doesn't affect the calculation of the remaining descriptors. Using an older version of `networkx` results in an error with importing `gcd` from `fractions`. It is likely better to ignore the error for now. 
 
 ## PaDEL-Descriptor
 
+PaDEL-Descriptor is provided at http://yapcwsoft.com/dd/padeldescriptor/ and calculates descriptors using The Chemistry Development Kit (CDK), similar to `rcdk`. However, PaDEL-Descriptor has an advantage in calculating 3D descriptors and more available fingerprints (12 compared to 1 for `rcdk`) though these will largely not be used here.
+
+### Setup
+
+PaDEL-Descriptor can handle both directories as well as individual SDFs. PaDEL-Descriptor has an advantage over Mordred and OCHEM in that the CSV it writes are properly deparsed and can handle commas in the name (i.e., in molecule names).
+
+The directories of the molecules generated in step 02 were passed to PaDEL-Descriptor. The filename was used as the molecule name. Outputs were written to `desc/padel`.
+
+The following settings were used:
+
+- Descriptors
+  - [x] 1D & 2D
+  - [x] 3D
+  - [ ] Fingerprints
+- Standardize
+  - [x] Remove salt
+  - [x] Detect aromaticity
+  - [x] Standardize tautomers
+  - [*empty*] SMIRKS tautomers file
+  - [x] Standardize nitro groups
+  - [x] Retain 3D coordinates
+  - Convert to 3D: *Yes (use MM2 forcefield)*
+- Advanced
+  - [x] Log
+  - Max. threads: *-1*
+  - Max. waiting jobs: *-1*
+  - Max. running time per molecule: 100 000
+  - Max. compounds per file: *0*
+  - [x] Retain molecules order
+  - [x] Use filename as molecule name
+  
+Additionally, for 1D & 2D descriptors and 3D descriptors, all available descriptors were selected. 
+
+Certain molecules will through a Java exception on calculation. Therefore, limiting the maximum runtime is necessary. On a Windows system with 16 GB RAM, 1 second is usually enough for a molecule, though the maximum limit is extended to 100 seconds to accomodate for larger molecules. When the operation times out, some descriptors may be left blank.  
