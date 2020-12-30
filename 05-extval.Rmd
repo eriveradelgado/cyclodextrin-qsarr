@@ -59,8 +59,10 @@ extval_list <- lapply(
 )
 
 # Generate appropriate file names
-extval_file <- str_replace(desc_file, "^desc/", "extval/")
-trn_file <- str_replace(desc_files, "^desc/", "trn/")
+extval_file <- str_replace(desc_file, "^desc/", "extval/") %>%
+  str_replace("(?i)csv|xls(x)?", "RDS")
+trn_file <- str_replace(desc_files, "^desc/", "trn/") %>%
+  str_replace("(?i)csv|xls(x)?", "RDS")
 
 # Create appropriate directories
 trn_dir <- paste0("trn/", list.files("desc", include.dirs = T))
