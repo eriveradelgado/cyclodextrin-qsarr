@@ -1,0 +1,87 @@
+---
+title: "05. Creating external validation sets"
+author: "Al Xin"
+date: "12/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+According to QSAR best practices [^1], models should be tested on external validation sets after training. This is distinct from a "test" set in the model-building process, which can be created from a split in the data or *k*-fold cross-validation, for example. Test sets are used to select models and may provide an inflated accuracy if interpreted as-is. 
+
+For each file of descriptors, 15% of the data will be set aside for external validation. External validation sets will be saved in the directory `extval`. The sets used in model evaluation will be in the directory `trn`. The directory structure of both of these directories will mirror that of `desc`. 
+
+```{r dir_create}
+if (!dir.exists("extval")) dir.create("extval")
+if (!dir.exists("trn")) dir.create("trn")
+```
+
+## Dependencies
+
+```{r dependencies}
+library(qsarr)
+library(stringr)
+library(dplyr)
+```
+
+## Reading data
+
+All the files contained in the directory `desc/` can be obtained using `list.files`. The following code assumes that descriptors are RDS, XLS, or CSV files with the suffix `.RDS`, `.xls`, `.xlsx`, or `.csv`. The functions `read_desc` and `read_desc_list` from `qsarr` can handle the reading of files in these three cases. 
+
+```{r}
+desc_file <- list.files(
+  "desc", 
+  recursive = T, 
+  full.names = T
+) %>%
+  .[str_detect(., "(?i)\\.(rds|csv|xls(x)?)$")]
+
+desc_list <- read_desc_list(desc_file, quiet = T)
+```
+
+## Splitting data
+
+The following uses `qsarr::make_extval`, which returns a list of data frames containing an entry for the retained data (named `"trn"`) and an entry for external validation data (named `"extval"`.) The data frames are then saved in the appropriate directories. 
+
+```{r}
+# Create a list, where each entry is a list with two elements
+  # trn: The data retained for training
+  # extval: The data for external validation
+extval_list <- lapply(
+  desc_list, 
+  make_extval, 
+  p = 0.15, 
+  seed = 20201230
+)
+
+# Generate appropriate file names
+extval_file <- str_replace(desc_file, "^desc/", "extval/")
+trn_file <- str_replace(desc_files, "^desc/", "trn/")
+
+# Create appropriate directories
+trn_dir <- paste0("trn/", list.files("desc", include.dirs = T))
+extval_dir <- paste0("extval/", list.files("desc", include.dirs = T))
+
+if (!dir.exists(trn_dir[1])) {
+  lapply(trn_dir, dir.create)
+  lapply(extval_dir, dir.create)
+}
+
+# Assigning to variable to prevent output
+ev_dwnld <- mapply(
+  function(df, t_dir, e_dir) {
+    saveRDS(df[["trn"]], t_dir)
+    saveRDS(df[["extval"]], e_dir)
+  }, 
+  df = extval_list, 
+  t_dir = trn_file, 
+  e_dir = extval_file
+)
+```
+
+[^1]: Tropsha (2010). Best Practices for QSAR Model Development, Validation, and Exploitation, *Molecular Informatics*. https://doi.org/10.1002/minf.201000061
+

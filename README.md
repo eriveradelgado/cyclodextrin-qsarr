@@ -63,6 +63,20 @@ File: `04-desc_external.Rmd
   - https://ochem.eu
 - Mordred
   - https://github.com/mordred-descriptor/mordred
+  
+### 05. Creating external validation sets
+
+File: `05-extval.Rmd`
+
+- 15% of the data is set aside for external validation
+- Data for external validation in directory `extval/`
+- Data for model building and training in directory `trn/`
+  
+### 06. Preprocessing chemical descriptors
+
+File: `06-preprocess.Rmd`
+
+
 
 ## Acknowledgements
 
