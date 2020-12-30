@@ -95,3 +95,5 @@ The following settings were used:
 Additionally, for 1D & 2D descriptors and 3D descriptors, all available descriptors were selected. 
 
 Certain molecules will through a Java exception on calculation. Therefore, limiting the maximum runtime is necessary. On a Windows system with 16 GB RAM, 1 second is usually enough for a molecule, though the maximum limit is extended to 100 seconds to accomodate for larger molecules. When the operation times out, some descriptors may be left blank.  
+
+Logging the results is optional and may be useful for troubleshooting.
