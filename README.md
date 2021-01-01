@@ -63,18 +63,26 @@ File: `04-desc_external.Rmd`
   - https://ochem.eu
 - Mordred
   - https://github.com/mordred-descriptor/mordred
-  
-### 05. Creating external validation sets
 
-File: `05-extval.Rmd`
+### 05. Joining affinity data to descriptors
+
+File: `05-join.Rmd`
+
+- Combining affinity data and the descriptors
+- Requires addition of guest names for OCHEM and Mordred descriptors
+- Requires renaming of the column `Name` in results from PaDEL
+
+### 06. Creating external validation sets
+
+File: `06-extval.Rmd`
 
 - 15% of the data is set aside for external validation
 - Data for external validation in directory `extval/`
 - Data for model building and training in directory `trn/`
   
-### 06. Preprocessing chemical descriptors
+### 07. Preprocessing chemical descriptors
 
-File: `06-preprocess.Rmd`
+File: `07-preprocess.Rmd`
 
 - Common preprocessing functions applied to data
   - Centering and scaling
