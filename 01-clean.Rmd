@@ -38,9 +38,9 @@ The data is read from the previous step. The data contains the following columns
 
 ### Solvent conditions 
 
-For consistency across observations, the data used will contain only observations conducted at 298 K in water as a solvent. Additionally, observations will be filtered to include observations from pH 6.8 to 7.5.
+For consistency across observations, the data used will contain only observations conducted at 298 K in water as a solvent. Additionally, observations will be filtered to include observations from pH 6.8 to 7.2.
 
-The original dataset contains 1367 observations. After cleaning for solvent conditions, the dataset contains 813 observations.
+The original dataset contains 1367 observations. After cleaning for solvent conditions, the dataset contains 802 observations.
 
 ```{r ri_solvent}
 # Reading the data from the previous step
@@ -96,13 +96,13 @@ ri <- ri %>%
   filter(
     solvent == "H2O", 
     temp == 298, 
-    6.8 <= pH & pH < 7.5
+    6.8 <= pH & pH <= 7.2
   )
 ```
 
 ### Data reliability
 
-According to the original Rekharsky and Inoue paper, datapoints with the footnote b, c, g, i, j, or m contain data that may be unreliable. These datapoints will be cleaned from the set. This leaves 785 observations.
+According to the original Rekharsky and Inoue paper, datapoints with the footnote b, c, g, i, j, or m contain data that may be unreliable. These datapoints will be cleaned from the set. This leaves 774 observations.
 
 ```{r ri_ref}
 ri <- filter(ri, !str_detect(ref, "b|c|g|i|j|m"))
@@ -110,7 +110,7 @@ ri <- filter(ri, !str_detect(ref, "b|c|g|i|j|m"))
 
 ### Removing salts
 
-Hydrochloride salts will also be removed from the dataset. These are guest ligands that contain `HCl` in the name. This leaves 719 observations. 
+Hydrochloride salts will also be removed from the dataset. These are guest ligands that contain `HCl` in the name. This leaves 708 observations. 
 
 ```{r ri_salt}
 ri <- filter(ri, !str_detect(guest, "HCl$"))
@@ -122,7 +122,7 @@ Estimates of Gibbs free energy containing margins of error (e.g., plus or minus 
 
 Any observations with no observation for Gibbs free energy will be removed. 
 
-Additionally, ligands with multiple reprted Gibbs free energy observations will be summarized by the average of the observations. This leaves 569 observations.
+Additionally, ligands with multiple reprted Gibbs free energy observations will be summarized by the average of the observations. This leaves 561 observations.
 
 ```{r ri_dg}
 ri <- ri %>%
@@ -136,12 +136,12 @@ ri <- filter(ri, !is.na(dG))
 
 ### Cyclodextrin hosts
 
-This study will only examine α-, β-, or γ-cyclodextrin. Other varieties of cyclodextrin will be removed from the dataset. This leaves 477 observations.
+This study will only examine α-, β-, or γ-cyclodextrin. Other varieties of cyclodextrin will be removed from the dataset. This leaves 470 observations.
 
 ```{r ri_cd}
 ri <- filter(
   ri, 
-  str_detect(host, "(^alpha)|(^beta)|(^gamma)"))
+  str_detect(host, "^(alpha|beta|gamma)"))
 ```
 
 ```{r ri_cd_cat, echo = F}
@@ -179,7 +179,7 @@ ri_replace <- read.csv("ligand_name.csv", header = T) %>%
   )
 ```
 
-The incorrect names can be iteratively replaced. A `for` loop is used here instead of `mapply` because the argument for replacement needs to be the result of the last function call. 
+The incorrect names can be iteratively replaced. A `for` loop is used here instead of `mapply` because the argument for replacement needs to be the result of the last function call. This results in 468 observations
 
 ```{r ri_replace_df}
 for (i in 1:nrow(ri_replace)) {
@@ -189,11 +189,16 @@ for (i in 1:nrow(ri_replace)) {
     replacement = ri_replace[i, 2]
   )
 }
+
+# Certain duplicated guests have to be collapsed
+ri <- ri %>%
+  group_by(host, guest) %>%
+  summarize(dG = mean(dG))
 ```
 
 ### Saving data
 
-The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `affinity/clean`. In total, 1367 observations were cleaned to 478 observations.
+The relevant columns for later steps are `host`, `guest`, and `dG`. These will be saved in `affinity/clean`. In total, 1367 observations were cleaned to 468 observations.
 
 ```{r ri_save}
 ri %>%
