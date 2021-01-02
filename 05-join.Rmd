@@ -66,19 +66,9 @@ guest_list <- lapply(
 names(guest_list) <- desc_name
 guest_list <- guest_list[sapply(guest_list, length) > 0]
 
-name_desc_list <- function(df_list, df_dir) {
-  df_name <- str_remove(
-    list.files(df_dir), 
-    "\\.[[:alpha:]]+$"
-    )
-  names(df_list) <- df_name
-  df_list
-}
-
 mordred_list <- read_desc_list(list.files("desc/mordred", full.names = T))
 
-mordred_list <- name_desc_list(mordred_list, "desc/mordred")
-
+mordred_name_temp <- names(mordred_list)
 mordred_list <- lapply(
   names(mordred_list), 
   function(x) {
@@ -90,19 +80,7 @@ mordred_list <- lapply(
       rename(guest = name)
   }
 )
-
-mordred_list <- name_desc_list(mordred_list, "desc/mordred")
-```
-
-After the files are joined, the data is saved in the appropriate directory. 
-
-```{r mordred_path}
-mordred_path <- paste0("join/mordred/", desc_name, ".RDS")
-mordred_result <- Map(
-  function(x, y) saveRDS(x, y), 
-  x = mordred_list, 
-  y = mordred_path
-)
+names(mordred_list) <- mordred_name_temp
 ```
 
 ### OCHEM
@@ -113,8 +91,8 @@ For indexing the guest names, `mordred_list` is recycled as the ordering of gues
 
 ```{r ochem}
 ochem_list <- read_desc_list(list.files("desc/ochem", full.names = T))
-names(ochem_list) <- list.files("desc/ochem") %>%
-  str_remove("\\.[[:alpha:]]+$")
+
+ochem_name_temp <- names(ochem_list)
 ochem_list <- lapply(
   names(ochem_list), 
   function(x) {
@@ -123,21 +101,7 @@ ochem_list <- lapply(
     mutate(df, guest = guest)
   }
 )
-
-# replacing the names
-names(ochem_list) <- list.files("desc/ochem") %>%
-  str_remove("\\.[[:alpha:]]+$")
-```
-
-The data is saved in the appropriate directory. 
-
-```{r ochem_path}
-ochem_path <- paste0("join/ochem/", desc_name, ".RDS")
-ochem_result <- Map(
-  function(x, y) saveRDS(x, y), 
-  x = ochem_list, 
-  y = ochem_path
-)
+names(ochem_list) <- ochem_name_temp
 ```
 
 ## Loading descriptor data
@@ -154,10 +118,10 @@ padel_list <- read_desc_list(
   list.files("desc/padel", full.names = T), 
   quiet = T
 ) %>%
-  lapply(function(x) rename(x, guest = Name))
-
-cdk_list <- name_desc_list(cdk_list, "desc/cdk")
-padel_list <- name_desc_list(padel_list, "desc/padel")
+  retain_name(
+    x = ., 
+    f = function(x) rename(x, guest = Name)
+    )
 ```
 
 ## Attaching affinity data
@@ -171,7 +135,6 @@ dg_list <- lapply(
   list.files("affinity/clean", full.names = T), 
   readRDS
 )
-dg_list <- name_desc_list(dg_list, "affinity/clean")
 ```
 
 Using a series of `lapply` functions, the descriptor lists can be attached to the correct affinity values. 
