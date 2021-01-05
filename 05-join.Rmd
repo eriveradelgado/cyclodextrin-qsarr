@@ -59,7 +59,7 @@ guest_list <- lapply(
   dir_list, 
   function(x) {
     list.files(x) %>%
-      str_remove("\\.SDF")
+      str_remove("(?i)\\.SDF")
   }
 )
 
@@ -131,9 +131,9 @@ The change in Gibbs free energy is read from the directory of cleaned affinity d
 This allows the function`attach_dg` to easily find the correct affinity when given the name of the descriptor files.
 
 ```{r}
-dg_list <- lapply(
+dg_list <- read_desc_list(
   list.files("affinity/clean", full.names = T), 
-  readRDS
+  quiet = T
 )
 ```
 
@@ -143,11 +143,10 @@ Using a series of `lapply` functions, the descriptor lists can be attached to th
 attach_dg <- function(df_list, d_name) {
   data_source <- str_extract(d_name, "^[[:alpha:]]+") 
   host_type <- str_extract(d_name, "[[:alpha:]]+$")
-  
+
   df <- df_list[[d_name]]
   dg <- dg_list[[data_source]] %>%
     filter(host == host_type)
-  
   inner_join(df, dg, by = "guest") %>%
     select(-host)
 }

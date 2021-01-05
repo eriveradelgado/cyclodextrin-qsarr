@@ -71,16 +71,20 @@ extval_file <- str_replace(join_file, "^join/", "extval/")
 trn_file <- str_replace(join_file, "^join/", "trn/")
 
 # Assigning to variable to prevent output
-ev_dwnld <- mapply(
+ev_dwnld <- Map(
   function(df, t_dir, e_dir) {
-    saveRDS(df[["trn"]], t_dir)
-    saveRDS(df[["extval"]], e_dir)
+    saveRDS(df$trn, t_dir)
+    saveRDS(df$extval, e_dir)
   }, 
   df = extval_list, 
   t_dir = trn_file, 
   e_dir = extval_file
 )
+temp <- Map(
+  function(df) nrow(df$trn), 
+  df = extval_list
+)
 ```
 
-[^1]: Tropsha (2010). Best Practices for QSAR Model Development, Validation, and Exploitation, *Molecular Informatics*. https://doi.org/10.1002/minf.201000061
+[^1]: Alexander Tropsha (2010). Best Practices for QSAR Model Development, Validation, and Exploitation, *Molecular Informatics*. https://doi.org/10.1002/minf.201000061
 
