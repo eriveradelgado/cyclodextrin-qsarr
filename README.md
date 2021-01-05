@@ -90,6 +90,13 @@ File: `07-preprocess.Rmd`
   - Removal of molecules with large amounts of missing data
 - If more than 5% of the chemical descriptors of a molecule are `NA` or `NaN`, the molecule is removed from the data. Otherwise, the descriptors are filled in using a simple mean.
 - These steps are performed on the data saved in `trn`
+- Removal of X-outliers 
+  - Use of algorithm discussed here: https://doi.org/10.1016/j.chemolab.2015.04.013
+  - Assumptions of standard deviation of descriptors
+  
+### 08. Random forest model
+
+File: `08-rf.Rmd`
 
 ## Acknowledgements
 
