@@ -89,8 +89,19 @@ Like Mordred, the descriptors from OCHEM also do not have the names of the guest
 
 For indexing the guest names, `mordred_list` is recycled as the ordering of guests is the same in both cases. In OCHEM, the indexing trick to populate the names for the Mordred descriptors cannot be used because there is no data on names.
 
-```{r ochem}
-ochem_list <- read_desc_list(list.files("desc/ochem", full.names = T))
+```{r ochem, message = F}
+ochem_list <- read_desc_list(list.files("desc/ochem", full.names = T)) 
+
+ochem_list <- retain_name(
+  ochem_list, 
+  function(x) {
+    lapply(
+      x, 
+      as.numeric
+    ) %>%
+      data.frame()
+  }
+)
 
 ochem_name_temp <- names(ochem_list)
 ochem_list <- lapply(
