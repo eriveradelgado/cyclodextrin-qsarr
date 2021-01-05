@@ -1,0 +1,319 @@
+---
+title: "06. Preprocessing chemical descriptors"
+author: "Al Xin"
+date: "12/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Data from the directory `trn` will be preprocessed. This will include centering and scaling the data (chemical descriptors will be coerced to a mean of 0 and standard deviation of 1), removal of descriptors with near-zero variance, and removal of molecules with more than 5% missing data. The preprocessed data will be saved in the directory `preprocess`. 
+
+Additionally, the binding affinity, which has been saved in `affinity/clean` will be merged with the data after processing.
+
+To make the process more clear, preprocessing will only be performed on the `rcdk` descriptors first. The reamining descriptors will be processed later. 
+
+```{r dir_create}
+# Create appropriate directories
+pp_dir <- paste0("preprocess/", list.files("desc", include.dirs = T)) 
+if (!dir.exists("preprocess")) dir.create("preprocess")
+if (!dir.exists(pp_dir[1])) lapply(pp_dir, dir.create)
+```
+
+## Dependencies
+
+Data transformations will use the `caret` package. 
+
+```{r dependencies, message = F}
+library(caret)
+library(qsarr)
+library(stringr)
+library(dplyr)
+```
+
+## Loading data
+
+```{r}
+cdk_list <- read_desc_list(
+  list.files("trn/cdk", full.names = T), 
+  quiet = T
+)
+```
+
+## Removing activity outliers
+
+Activity outliers are extreme observations of Gibbs free energy. The standard for the cutoff is flexible, as many QSAR methods can handle outliers. For this investigation, the outliers are observations more than 3 standard deviations away from the mean Gibbs free energy change. 
+
+For the CDK descriptors, the data sets all contain less than 5 outliers.
+
+```{r}
+cdk_list <- retain_name(
+  cdk_list,
+  remove_col_outlier,
+  col = "dG",
+  quiet = F
+)
+```
+## Cleaning NA data
+
+When analyzing descriptors, it is usually easier to handle `NA` values than `NaN` values. The initial step will be to replace `NaN`s with `NA` in the list of data sets. 
+
+```{r}
+cdk_list <- retain_name(cdk_list, replace_nan)
+```
+
+Additionally, there are certain descriptors that cannot be calculated for a significant number of the chemicals examined. In this case, descriptors that return `NA` for more than 20% of processed molecules will be removed. This boundary is mostly arbitrary. It is based off the intuition that a predictor that is unusable for a fifth of molecules would be unhelpful in model building.
+
+```{r}
+cdk_list <- retain_name(cdk_list, remove_col_na)
+```
+
+## Removing structure outliers
+
+### Basic preprocessing
+
+The standard preprocessing steps to consider would be centering the data, scaling the data, and removing variables with near zero variance. This is bundled together in the function `center_scale_zero` from `qsarr`.
+
+Compared to removing based on `NA` proportion, many more variables are removed due to near-zero variance. The number of columns removed ranges from around 70 to around 160 out of 214 predictors. 
+
+```{r center_scale_zero}
+# Columns that are not predictors
+non_pred <- c("guest", "dG")
+
+center_scale_zero <- function(df, ignore_col = NA, quiet = T, ...) {
+  if (!is.na(ignore_col[1])) {
+    ignore_index <- which(names(df) %in% ignore_col)
+    df_retain <- df[, ignore_index]
+    df <- df[, -ignore_index]
+  }
+
+  # Centering and scaling
+  df <- lapply(
+    df,
+    function(x) {
+      # Center by subtracting the mean
+      # Scale by dividing by standard deviation
+      (x - mean(x, na.rm = T)) / sd_pop(x)
+    }
+  ) %>%
+    data.frame()
+
+  # Remove variable with near-zero variance
+  param <- list(x = df, ...)
+  zero_var <- do.call(nearZeroVar, param)
+  df <- df[, -zero_var]
+
+  if (!quiet) {
+    message(length(zero_var), " variables had near-zero variance.")
+  }
+  data.frame(df_retain, df)
+}
+
+sd_pop <- function(x, quiet = T) {
+  if (sum(is.na(x))) {
+    if (!quiet) message("Removing NAs when finding std. deviation")
+    x <- !x[is.na(x)]
+  }
+
+  if (sum(is.nan(x))) {
+    if (!quiet) message("Removing NaNs when finding std. deviation")
+    x <- !x[is.nan(x)]
+  }
+
+  sd <- sum((x - mean(x))^2)
+  sqrt(sd / length(x))
+}
+
+cdk_list <- retain_name(
+  cdk_list, 
+  center_scale_zero, 
+  ignore_col = non_pred, 
+  quiet = F
+  )
+```
+
+```{r}
+ad <- function(df, ignore_col = NA) {
+  if (!is.na(ignore_col[1])) {
+    ignore_index <- which(names(df) %in% ignore_col)
+    df <- df[, -ignore_index]
+  }
+
+  if (sum(!sapply(df, is.numeric))) {
+    message(
+      "Error: non-numeric columns passed", "\n",
+      "Coerce data frame or specify columns to ignore"
+    )
+    return()
+  }
+
+  obj <- list(
+    x_mean = sapply(df, mean, na.rm = T),
+    x_sd = sapply(df, sd_pop),
+    ignore_col = ignore_col
+  )
+
+  class(obj) <- "ad"
+  obj
+}
+
+# predict <- function(ad, ...) {
+#   UseMethod("predict", ad)
+# }
+
+predict.ad <- function(ad, df, ignore_more = NA, ...) {
+  ignore_col <- unique(c(ad$ignore_col, ignore_more))
+  if (!is.na(ignore_col[1])) {
+    ignore_index <- which(names(df) %in% ignore_col)
+    df <- df[, -ignore_index]
+  }
+  
+  # Check for same length
+  if (ncol(df) != length(ad$x_mean)) {
+    message(
+      "Number of predictors does not match applicability domain", "\n",
+      "Consider ignoring columns with `ignore_more =`"
+    )
+    return()
+  }
+  
+  # Check for matching names
+  if (sum(names(df) %in% names(ad$x_mean)) < ncol(df)) {
+    message(
+      "Names of predictors does not match applicability domain", "\n"
+    )
+    return()
+  }
+  
+  std_df <- lapply(
+    names(df), 
+    function(x) {
+      x_mean <- ad$x_mean[x]
+      x_sd <- ad$x_sd[x]
+      abs(df[, x] - x_mean) / x_sd
+    }
+  ) %>%
+    data.frame()
+  
+  # Apply a function rowwise
+  # returns T if inside domain
+  sapply(
+    1:nrow(std_df), 
+    function(x) {
+      x <- std_df[x, ] %>% as.numeric()
+      if (min(x) > 3) return(F)
+      if (max(x) < 3) return(T)
+
+      s_new <- mean(x) + 1.28 * sd_pop(x)
+      ifelse(s_new < 3, T, F)
+    }
+  )
+}
+
+remove_xoutlier <- function(df, quiet = T, ...) {
+  ad_obj <- ad(df, ...)
+  outlier_index <- predict(ad_obj, df, ...)
+  if (!quiet) {
+    message(sum(!outlier_index), " observations outside of domain")
+  }
+  df[outlier_index, ]
+}
+```
+
+### Standard deviation method of AD
+
+After these steps are accomplished, structural outliers can be removed. The method used here is derived from a 2015 paper from Roy, Kar, and Ambure.[^1] The method is used in the method `predict.ad`.[^2] 
+
+```{r remove_xoutlier}
+cdk_list <- retain_name(
+  cdk_list, 
+  remove_xoutlier, 
+  ignore_col = non_pred, 
+  quiet = F
+)
+```
+
+## Saving data
+
+```{r}
+cdk_save <- sapply(
+  names(cdk_list), 
+  function(x) {
+    pp_dir <- paste0("preprocess/cdk/", x, ".RDS")
+    saveRDS(cdk_list[x], pp_dir)
+  }
+)
+```
+
+## Repeat above for all data
+
+```{r}
+non_cdk <- c("mordred", "ochem", "padel")
+
+# reading all the  non-cdk files
+trn_list <- lapply(
+  paste0("trn/", non_cdk), 
+  function(x) {
+    fnames <- list.files(x, full.names = T)
+    read_desc_list(fnames, quiet = T)
+  }
+)
+  
+# renaming names to be descriptor specific
+trn_list <- Map(
+  function(df_list, desc_name) {
+    names(df_list) <- paste0(desc_name, "/", names(df_list))
+    df_list
+  }, 
+  df_list = trn_list, 
+  desc_name = non_cdk
+) %>%
+  unlist(recursive = F)
+
+# # remove response outliers 
+# trn_list <- retain_name(
+#   trn_list,
+#   remove_col_outlier,
+#   col = "dG"
+# )
+
+# Clean NAs
+# remove Y-outliers
+pp_list <- retain_name(trn_list, replace_nan) %>%
+  retain_name(., remove_col_na) %>%
+  retain_name(
+    ., 
+    remove_col_outlier, 
+    col = "dG"
+  )
+
+# Center, scale, and remove variable w/ near-zero variance
+pp_list <- retain_name(
+  pp_list, 
+  center_scale_zero, 
+  ignore_col = non_pred
+)
+
+# Remove X-outlier
+pp_list <- retain_name(
+  pp_list, 
+  remove_xoutlier, 
+  ignore_col = non_pred
+)
+
+# Save files
+pp_save <- sapply(
+  names(pp_list), 
+  function(x) {
+    pp_dir <- paste0("preprocess/", x, ".RDS")
+    saveRDS(cdk_list[x], pp_dir)
+  }
+)
+```
+
+[^1]: Kunal roy, Supratik Kar, Pravin Ambure (2015). Chemocetrics and Intelligent Laboratory Systems, https://doi.org/10.1016/j.chemolab.2015.04.013
+[^2]: `"ad"` is short for applicability domain. This is an S3 class defined in `qsarr`. The method `predict.ad` returns a boolean vector on whether molecules (rows) are in the domain as defined by the `"ad"` class. 
