@@ -66,10 +66,15 @@ When analyzing descriptors, it is usually easier to handle `NA` values than `NaN
 cdk_list <- retain_name(cdk_list, replace_nan)
 ```
 
-Additionally, there are certain descriptors that cannot be calculated for a significant number of the chemicals examined. In this case, descriptors that return `NA` for more than 20% of processed molecules will be removed. This boundary is mostly arbitrary. It is based off the intuition that a predictor that is unusable for a fifth of molecules would be unhelpful in model building.
+Additionally, there are certain descriptors that cannot be calculated for a significant number of the chemicals examined. In this case, descriptors that return `NA` for more than 10% of processed molecules will be removed. This boundary is mostly arbitrary. It is based off the intuition that a predictor that is unusable for a tenth of molecules would be unhelpful in model building.
 
 ```{r}
-cdk_list <- retain_name(cdk_list, remove_col_na)
+cdk_list <- retain_name(
+  cdk_list, 
+  remove_col_na, 
+  threshold = 0.1, 
+  quiet = F
+)
 ```
 
 ## Removing structure outliers
@@ -83,50 +88,6 @@ Compared to removing based on `NA` proportion, many more variables are removed d
 ```{r center_scale_zero}
 # Columns that are not predictors
 non_pred <- c("guest", "dG")
-
-center_scale_zero <- function(df, ignore_col = NA, quiet = T, ...) {
-  if (!is.na(ignore_col[1])) {
-    ignore_index <- which(names(df) %in% ignore_col)
-    df_retain <- df[, ignore_index]
-    df <- df[, -ignore_index]
-  }
-
-  # Centering and scaling
-  df <- lapply(
-    df,
-    function(x) {
-      # Center by subtracting the mean
-      # Scale by dividing by standard deviation
-      (x - mean(x, na.rm = T)) / sd_pop(x)
-    }
-  ) %>%
-    data.frame()
-
-  # Remove variable with near-zero variance
-  param <- list(x = df, ...)
-  zero_var <- do.call(nearZeroVar, param)
-  df <- df[, -zero_var]
-
-  if (!quiet) {
-    message(length(zero_var), " variables had near-zero variance.")
-  }
-  data.frame(df_retain, df)
-}
-
-sd_pop <- function(x, quiet = T) {
-  if (sum(is.na(x))) {
-    if (!quiet) message("Removing NAs when finding std. deviation")
-    x <- !x[is.na(x)]
-  }
-
-  if (sum(is.nan(x))) {
-    if (!quiet) message("Removing NaNs when finding std. deviation")
-    x <- !x[is.nan(x)]
-  }
-
-  sd <- sum((x - mean(x))^2)
-  sqrt(sd / length(x))
-}
 
 cdk_list <- retain_name(
   cdk_list, 
@@ -156,7 +117,7 @@ cdk_save <- sapply(
   names(cdk_list), 
   function(x) {
     pp_dir <- paste0("preprocess/cdk/", x, ".RDS")
-    saveRDS(cdk_list[x], pp_dir)
+    saveRDS(cdk_list[[x]], pp_dir)
   }
 )
 ```
@@ -215,7 +176,7 @@ pp_save <- sapply(
   names(pp_list), 
   function(x) {
     pp_dir <- paste0("preprocess/", x, ".RDS")
-    saveRDS(cdk_list[x], pp_dir)
+    saveRDS(pp_list[[x]], pp_dir)
   }
 )
 ```
