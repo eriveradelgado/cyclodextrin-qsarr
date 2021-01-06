@@ -110,6 +110,20 @@ cdk_list <- retain_name(
 )
 ```
 
+## Final NA replacement
+
+After the above cleaning steps, the mean of each descriptor should be 0. The NAs in the data frame will be replaced with 0, as per the assumption that missing values should be assumed to be the expectation of the descriptor. 
+
+```{r}
+cdk_list <- lapply(
+  cdk_list, 
+  function(x) {
+    replace_na(x, list(rep(0, ncol(x))))
+  }
+)
+```
+
+
 ## Saving data
 
 ```{r}
@@ -169,6 +183,14 @@ pp_list <- retain_name(
   pp_list, 
   remove_xoutlier, 
   ignore_col = non_pred
+)
+
+# Replace NA
+pp_list <- lapply(
+  pp_list, 
+  function(x) {
+    replace_na(x, list(rep(0, ncol(x))))
+  }
 )
 
 # Save files
