@@ -751,6 +751,7 @@ cdk_rf_save <- lapply(
 ```
 
 ```{r}
+set.seed(20210108)
 mordred_list <- read_desc_list(
   list.files("preprocess/mordred", full.names = T), 
   quiet = T
@@ -769,19 +770,18 @@ mordred_rf <- lapply(
   nrep = 10,
   ntree = 300,
   replace = c(T, F),
-  mtry = c(2, 4, 8, 16, 32),
+  mtry = c(1, 2, 4, 8, 12),
   maxnodes = c(NULL, 10, 20, 50)
 )
 dir.create("model/rf/mordred")
-cdk_rf_save <- lapply(
+mordred_rf_save <- lapply(
   names(mordred_rf), 
   function(x) {
     saveRDS(mordred_rf[[x]], paste0("model/rf/mordred/", x, ".RDS"))
   }
 )
-```
 
-```{r}
+set.seed(20210108)
 ochem_list <- read_desc_list(
   list.files("preprocess/ochem", full.names = T), 
   quiet = T
@@ -804,7 +804,7 @@ ochem_rf <- lapply(
   maxnodes = c(NULL, 10, 20, 50)
 )
 dir.create("model/rf/ochem")
-cdk_rf_save <- lapply(
+ochem_rf_save <- lapply(
   names(ochem_rf), 
   function(x) {
     saveRDS(ochem_rf[[x]], paste0("model/rf/ochem/", x, ".RDS"))
