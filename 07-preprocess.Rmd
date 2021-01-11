@@ -11,17 +11,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Overview
 
-Data from the directory `trn` will be preprocessed. This will include centering and scaling the data (chemical descriptors will be coerced to a mean of 0 and standard deviation of 1), removal of descriptors with near-zero variance, and removal of molecules with more than 5% missing data. The preprocessed data will be saved in the directory `preprocess`. 
+Data from the directory `trn/` will be preprocessed. This will include centering and scaling the data (chemical descriptors will be coerced to a mean of 0 and standard deviation of 1), removal of descriptors with near-zero variance, and removal of molecules with more than 5% missing data. The preprocessed data will be saved in the directory `preprocess/`. Additionally, the settings for preprocessing will be saved in the directory `ad/`, short for applicability domain.
 
-Additionally, the binding affinity, which has been saved in `affinity/clean` will be merged with the data after processing.
+Additionally, the binding affinity, which has been saved in `affinity/clean/` will be merged with the data after processing.
 
-To make the process more clear, preprocessing will only be performed on the `rcdk` descriptors first. The reamining descriptors will be processed later. 
+To make the process more clear, preprocessing will only be performed on the `rcdk` descriptors first. The remaining descriptors will be processed later. 
 
 ```{r dir_create}
 # Create appropriate directories
 pp_dir <- paste0("preprocess/", list.files("desc", include.dirs = T)) 
+ad_dir <- paste0("ad/", list.files("desc", include.dirs = T))
 if (!dir.exists("preprocess")) dir.create("preprocess")
 if (!dir.exists(pp_dir[1])) lapply(pp_dir, dir.create)
+if (!dir.exists("ad")) dir.create("ad")
+if (!dir.exists(ad_dir[1])) lapply(ad_dir, dir.create)
 ```
 
 ## Dependencies
@@ -81,20 +84,35 @@ cdk_list <- retain_name(
 
 ### Basic preprocessing
 
-The standard preprocessing steps to consider would be centering the data, scaling the data, and removing variables with near zero variance. This is bundled together in the function `center_scale_zero` from `qsarr`.
+The standard preprocessing steps to consider would be removing variables with near zero variance, centering the data, and scaling the data. Removing variable with near zero variance can be accomplished with `qsarr:remove_zerovar`. Centering and scaling is bundled together in the function `qsarr::center_scale`.
 
-Compared to removing based on `NA` proportion, many more variables are removed due to near-zero variance. The number of columns removed ranges from around 70 to around 160 out of 214 predictors. 
+Compared to removing based on `NA` proportion, many more variables are removed due to near-zero variance. The number of columns removed ranges from around 80 to 110 out of around 210 predictors. Because the data mostly suffers from potential overfitting (many more predictors than observations), the frequency cutoff for near zero variance is lower than the default (the default is `freqCut = 95/5`).
+
+When centering and scaling, the `"ad"` object is returned for use with applicability domain analysis on external validation data later.
 
 ```{r center_scale_zero}
 # Columns that are not predictors
 non_pred <- c("guest", "dG")
 
+# tst <- remove_zerovar(cdk_list[[2]], ignore_col = non_pred, quiet = F)
+
 cdk_list <- retain_name(
   cdk_list, 
-  center_scale_zero, 
+  remove_zerovar, 
   ignore_col = non_pred, 
-  quiet = F
+  quiet = F, 
+  freqCut = 90/10
   )
+
+cdk_list_ad <- retain_name(
+  cdk_list, 
+  center_scale, 
+  ignore_col = non_pred, 
+  return_ad = T
+)
+
+cdk_list <- retain_name(cdk_list_ad, function(x) x$df)
+cdk_ad <- retain_name(cdk_list_ad, function(x) x$ad)
 ```
 
 ### Standard deviation method of AD
@@ -109,20 +127,6 @@ cdk_list <- retain_name(
   quiet = F
 )
 ```
-
-## Final NA replacement
-
-After the above cleaning steps, the mean of each descriptor should be 0. The NAs in the data frame will be replaced with 0, as per the assumption that missing values should be assumed to be the expectation of the descriptor. 
-
-```{r}
-cdk_list <- lapply(
-  cdk_list, 
-  function(x) {
-    replace_na(x, list(rep(0, ncol(x))))
-  }
-)
-```
-
 
 ## Saving data
 
@@ -139,11 +143,9 @@ cdk_save <- sapply(
 ## Repeat above for all data
 
 ```{r}
-non_cdk <- c("mordred", "ochem", "padel")
-
 # reading all the  non-cdk files
 trn_list <- lapply(
-  paste0("trn/", non_cdk), 
+  paste0("trn/", c("mordred", "ochem", "padel")), 
   function(x) {
     fnames <- list.files(x, full.names = T)
     read_desc_list(fnames, quiet = T)
@@ -157,7 +159,7 @@ trn_list <- Map(
     df_list
   }, 
   df_list = trn_list, 
-  desc_name = non_cdk
+  desc_name = c("mordred", "ochem", "padel")
 ) %>%
   unlist(recursive = F)
 
@@ -174,23 +176,27 @@ pp_list <- retain_name(trn_list, replace_nan) %>%
 # Center, scale, and remove variable w/ near-zero variance
 pp_list <- retain_name(
   pp_list, 
-  center_scale_zero, 
-  ignore_col = non_pred
+  remove_zerovar, 
+  ignore_col = non_pred, 
+  freqCut = 90/10
 )
+
+pp_list_ad <- retain_name(
+  pp_list, 
+  center_scale, 
+  ignore_col = non_pred, 
+  return_ad = T
+)
+
+pp_list <- retain_name(pp_list_ad, function(x) x$df)
+pp_ad <- retain_name(pp_list_ad, function(x) x$ad)
 
 # Remove X-outlier
 pp_list <- retain_name(
   pp_list, 
   remove_xoutlier, 
-  ignore_col = non_pred
-)
-
-# Replace NA
-pp_list <- lapply(
-  pp_list, 
-  function(x) {
-    replace_na(x, list(rep(0, ncol(x))))
-  }
+  ignore_col = non_pred, 
+  quiet = F
 )
 
 # Save files
@@ -201,7 +207,54 @@ pp_save <- sapply(
     saveRDS(pp_list[[x]], pp_dir)
   }
 )
+
 ```
+
+## Applicability domain
+
+The settings for preprocessing used on the training set  will be important in preprocessing future data (the external validation set).
+
+```{r}
+# reading all files
+desc_list <- lapply(
+  paste0("trn/", c("cdk", "mordred", "ochem", "padel")), 
+  function(x) {
+    fnames <- list.files(x, full.names = T)
+    read_desc_list(fnames, quiet = T)
+  }
+)
+
+# renaming to be descriptor specific
+# doing initial cleaning
+desc_list <- Map(
+  function(df_list, desc_name) {
+    names(df_list) <- paste0(desc_name, "/", names(df_list))
+    df_list
+  }, 
+  df_list = desc_list, 
+  desc_name = c("cdk", "mordred", "ochem", "padel")
+) %>%
+  unlist(recursive = F)
+
+desc_list <- retain_name(desc_list, replace_nan) %>%
+  retain_name(., remove_col_na) %>%
+  retain_name(., remove_col_outlier, col = "dG")
+
+# Getting variables without near-zero variance
+# This step is admittedly
+
+ad_list <- retain_name(desc_list, ad, ignore_col = non_pred)
+
+# Saving applicability domain objects
+ad_save <- sapply(
+  names(ad_list), 
+  function(x) {
+    ad_dir <- paste0("ad/", x, ".RDS")
+    saveRDS(ad_list[[x]], ad_dir)
+  }
+)
+```
+
 
 [^1]: Kunal roy, Supratik Kar, Pravin Ambure (2015). Chemocetrics and Intelligent Laboratory Systems, https://doi.org/10.1016/j.chemolab.2015.04.013
 [^2]: `"ad"` is short for applicability domain. This is an S3 class defined in `qsarr`. The method `predict.ad` returns a boolean vector on whether molecules (rows) are in the domain as defined by the `"ad"` class. 
