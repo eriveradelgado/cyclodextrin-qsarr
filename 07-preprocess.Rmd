@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = F)
 ```
 
 ## Overview
@@ -16,6 +16,9 @@ Data from the directory `trn/` will be preprocessed. This will include centering
 Additionally, the binding affinity, which has been saved in `affinity/clean/` will be merged with the data after processing.
 
 To make the process more clear, preprocessing will only be performed on the `rcdk` descriptors first. The remaining descriptors will be processed later. 
+### Running code
+
+Because this step is time-consuming, the default action for the chunks has been set to `eval = F`. If this code needs to be rerun, the code in the chunk `setup` needs to be corrected so that `eval = F` is removed from the default chunk settings.
 
 ```{r dir_create}
 # Create appropriate directories
@@ -130,6 +133,10 @@ cdk_list <- retain_name(
 
 ## Saving data
 
+The preprocessed data will be saved in `preprocess/cdk/`.
+
+The `"ad"` objects will be saved later, grouped along with the other descriptor sources.
+
 ```{r}
 cdk_save <- sapply(
   names(cdk_list), 
@@ -141,6 +148,8 @@ cdk_save <- sapply(
 ```
 
 ## Repeat above for all data
+
+The above steps for preprocessing can now be repeated on the other three descriptor sources: Mordred, OCHEM, and PaDEL-Descriptor. 
 
 ```{r}
 # reading all the  non-cdk files
@@ -212,38 +221,18 @@ pp_save <- sapply(
 
 ## Applicability domain
 
-The settings for preprocessing used on the training set  will be important in preprocessing future data (the external validation set).
+The settings for preprocessing used on the training set  will be important in preprocessing future data (the external validation set). They will be saved in `ad/` with the same directory organization as `preprocess/`.
 
 ```{r}
 # reading all files
-desc_list <- lapply(
-  paste0("trn/", c("cdk", "mordred", "ochem", "padel")), 
-  function(x) {
-    fnames <- list.files(x, full.names = T)
-    read_desc_list(fnames, quiet = T)
-  }
-)
-
-# renaming to be descriptor specific
-# doing initial cleaning
-desc_list <- Map(
-  function(df_list, desc_name) {
-    names(df_list) <- paste0(desc_name, "/", names(df_list))
-    df_list
-  }, 
-  df_list = desc_list, 
-  desc_name = c("cdk", "mordred", "ochem", "padel")
-) %>%
-  unlist(recursive = F)
-
-desc_list <- retain_name(desc_list, replace_nan) %>%
-  retain_name(., remove_col_na) %>%
-  retain_name(., remove_col_outlier, col = "dG")
-
-# Getting variables without near-zero variance
-# This step is admittedly
-
-ad_list <- retain_name(desc_list, ad, ignore_col = non_pred)
+ad_list <- list(cdk_ad, pp_ad) %>% 
+  unlist(recursive = F) %>%
+  setNames(
+    paste0(
+      sapply(c("cdk", "mordred", "ochem", "padel"), rep, length(cdk_ad)), 
+      "/", names(cdk_ad)
+    )
+  )
 
 # Saving applicability domain objects
 ad_save <- sapply(
