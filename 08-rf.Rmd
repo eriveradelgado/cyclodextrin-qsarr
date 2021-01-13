@@ -27,9 +27,15 @@ library(qsarr)
 library(randomForest)
 ```
 ```{r}
-dir.create("model")
-dir.create("model/rf")
-dir.create("model/rf/demo")
+if (!dir.exists("model")) dir.create("model")
+if (!dir.exists("model/rf")) dir.create("model/rf")
+if (!dir.exists("model/rf/demo")) {
+  dir_save <- sapply(
+    paste0("model/rf/"), 
+    c("demo", "cdk", "mordred", "ochem", "padel")
+  )  
+}
+
 ```
 
 ## "Out of the bag" model building
@@ -56,74 +62,74 @@ demo <- cdk_list[["ri_alpha"]]
 Without any tuning, the following results are achieved with 10 repetitions of 10-fold cross-validation: 
 
 ```{r eval_model}
-eval_model <- function(formula, 
-                       df, 
-                       method, 
-                       nfold = 10,
-                       resp = 1,
-                       simplify = T,
-                       ...) {
-  fold_index <- createFolds(y = df[, resp], k = nfold)
-  
-  result <- lapply(
-    fold_index, 
-    function(ind) {
-      trn <- df[-ind, ]
-      tst <- df[ind, ]
-      param <- list(
-        formula = formula, 
-        data = trn, 
-        ...
-      )
-      
-      model <- switch(
-        method, 
-        "rf" = do.call(randomForest, param)
-      )
-      
-      pred_y <- predict(model, tst)
-      pred_df <- data.frame(tst[resp], pred_y)
-      colnames(pred_df) <- c("obs", "pred")
-      
-      defaultSummary(pred_df)
-    }
-  ) %>%
-    do.call(rbind, .) %>%
-    data.frame() %>%
-    rownames_to_column(var = "fold") %>%
-    pivot_longer(!fold, names_to = "summary_stat")
-  
-  if (simplify) {
-    result %>%
-      group_by(summary_stat) %>%
-      summarize(
-        fold_avg = mean(value), 
-        fold_sd = sd(value) #sd_pop
-      ) %>%
-      data.frame()
-  }
-  
-  result
-  # result
-}
-
-eval_model_rep <- function(nrep = 10, ...) {
-  # print(list(...))
-  param <- list(..., simplify = F)
-  rep_list <- replicate(
-    nrep, 
-    do.call(eval_model, param), 
-    simplify = F
-    )
-  
-  do.call(rbind, rep_list) %>%
-    group_by(summary_stat) %>%
-    summarize(
-      fold_avg = mean(value), 
-      fold_sd = sd(value) #sd_pop
-    ) %>%
-    data.frame()
-}
+# eval_model <- function(formula, 
+#                        df, 
+#                        method, 
+#                        nfold = 10,
+#                        resp = 1,
+#                        simplify = T,
+#                        ...) {
+#   fold_index <- createFolds(y = df[, resp], k = nfold)
+#   
+#   result <- lapply(
+#     fold_index, 
+#     function(ind) {
+#       trn <- df[-ind, ]
+#       tst <- df[ind, ]
+#       param <- list(
+#         formula = formula, 
+#         data = trn, 
+#         ...
+#       )
+#       
+#       model <- switch(
+#         method, 
+#         "rf" = do.call(randomForest, param)
+#       )
+#       
+#       pred_y <- predict(model, tst)
+#       pred_df <- data.frame(tst[resp], pred_y)
+#       colnames(pred_df) <- c("obs", "pred")
+#       
+#       defaultSummary(pred_df)
+#     }
+#   ) %>%
+#     do.call(rbind, .) %>%
+#     data.frame() %>%
+#     rownames_to_column(var = "fold") %>%
+#     pivot_longer(!fold, names_to = "summary_stat")
+#   
+#   if (simplify) {
+#     result %>%
+#       group_by(summary_stat) %>%
+#       summarize(
+#         fold_avg = mean(value), 
+#         fold_sd = sd(value) #sd_pop
+#       ) %>%
+#       data.frame()
+#   }
+#   
+#   result
+#   # result
+# }
+# 
+# eval_model_rep <- function(nrep = 10, ...) {
+#   # print(list(...))
+#   param <- list(..., simplify = F)
+#   rep_list <- replicate(
+#     nrep, 
+#     do.call(eval_model, param), 
+#     simplify = F
+#     )
+#   
+#   do.call(rbind, rep_list) %>%
+#     group_by(summary_stat) %>%
+#     summarize(
+#       fold_avg = mean(value), 
+#       fold_sd = sd_pop(value) 
+#     ) %>%
+#     data.frame()
+# }
 ```
 
 ```{r eval_model2}
@@ -140,7 +146,7 @@ eval_model <- function(df,
   }
   
   ignore_index <- which(names(df) %in% ignore_col)
-  if(length(ignore_index)) {
+  if (length(ignore_index)) {
     df <- df[, -ignore_index]
   }
   
@@ -232,7 +238,20 @@ eval_model_rep <- function(nrep = 10, ...) {
     ) %>%
     data.frame()
   
-  inner_join(df1, df2, by = "summary_stat")
+  
+  df_summary <- inner_join(df1, df2, by = "summary_stat")
+  
+  # Not collapsing the folds
+  df3 <- df_all %>%
+    group_by(summary_stat, nrep) %>%
+    summarize(
+      avg = mean(value, na.rm = T), 
+      sd = sd_pop(value), 
+      .groups = "drop"
+    ) %>%
+    data.frame()
+  
+  list(result_summary = df_summary, result_all = df3)
 }
 ```
 
@@ -254,7 +273,8 @@ demo_ootb <- eval_model_rep(
   df = demo, 
   method = "rf",  
   resp = "dG", 
-  nfold = 10
+  nfold = 10, 
+  ignore_col = "guest"
 )
 
 # demo_ootb3 <- eval_model_rep(
@@ -274,11 +294,12 @@ demo_ootb <- eval_model_rep(
 #   simplify = F
 # ), simplify = F)
 
-lapply(1:length(demo_rf_ootb2), 
-       function(x) {
-         demo_rf_ootb2[[x]] %>%
-           mutate(nrep = x)
-       })
+# lapply(1:length(demo_rf_ootb2), 
+#        function(x) {
+#          demo_rf_ootb2[[x]] %>%
+#            mutate(nrep = x)
+#        })
+
 saveRDS(demo_ootb, "model/rf/demo/ootb.RDS")
 ```
 ```{r}
@@ -324,7 +345,8 @@ demo_caret <- eval_model_rep(
   nfold = 10,
   nrep = 10,
   resp = "dG", 
-  mtry = 107
+  mtry = 107, 
+  ignore_col = "guest"
 )
 saveRDS(demo_caret, "model/rf/demo/caret2.RDS")
 ```
@@ -342,6 +364,10 @@ First, the number of trees
 
 ```{r}
 tune <- function(method, ...) {
+  if (missing(method)) {
+    messages("Sp")
+    return()
+  }
   dummy <- 1
   class(dummy) <- switch(
     method, 
@@ -359,7 +385,7 @@ tune_helper <- function(method,
                         ...) {
   # obtaining all combinations of parameters
   tune_grid <- expand.grid(list(...), stringsAsFactors = F)
-
+  
   tune_grid_list <- split(tune_grid, seq(nrow(tune_grid)))
   names(tune_grid_list) <- NULL
 
@@ -388,7 +414,7 @@ tune_helper <- function(method,
     function(x, y) {
       list(
         param = x, 
-        result = y
+        result = y$result_summary
       )
     }, 
     x = tune_grid_list, 
@@ -398,14 +424,12 @@ tune_helper <- function(method,
   tune_index <- best_summary_stat(tune_list = tune_list)
   
   list(
-    best_param = tune_grid_list[[tune_index]],
-    best_result = tune_list[[tune_index]],
+    param = tune_grid_list[[tune_index]],
+    result_summary = tune_list[[tune_index]]$result_summary,
+    result_all = tune_list[[tune_index]]$result_all,
     best_index = tune_index,
     all_tune = param_list
   )
-  
-  # class(obj) <- "tune"
-  # obj
 }
 
 tune.randomForest <- function(method, 
@@ -413,18 +437,13 @@ tune.randomForest <- function(method,
                               resp, 
                               nfold = 10, 
                               nrep = 1, 
-                              ignore_col = NA, 
+                              ignore_col = NA,
                               ...) {
-  # if (!length(list(...))) {
-  #   message("Pass parameters for tuning")
-  #   return()
-  # }
-  # print(method)
   if (missing(resp) || missing(df)) {
     message("Specify a response variable and data frame")
     return()
   }
-  
+
   tune_obj <- tune_helper(
     method = method,
     df = df, 
@@ -435,8 +454,15 @@ tune.randomForest <- function(method,
     ...
     )
   
+  if (!is.na(ignore_col)) {
+    ignore_index <- which(names(df) %in% ignore_col)
+    if (length(ignore_index)) {
+      df <- df[,-ignore_index]
+    }
+  }
+  
   final_param <- append(
-    tune_obj$best_param,
+    tune_obj$param,
     list(
       formula = as.formula(paste0(resp, " ~ .")), 
       data = df
@@ -449,10 +475,11 @@ tune.randomForest <- function(method,
   obj <- append(
     tune_obj, 
     list(
-      best_model = final_model, 
+      model = final_model, 
       param_tested = list(...), 
       nfold_tested = nfold, 
-      nrep_tested = nrep
+      nrep_tested = nrep, 
+      pred_name = names(df)[names(df) != resp]
       )
   )
   class(obj) <- "tune"
@@ -470,11 +497,12 @@ normalize_summary_stat <- function(tune_list, stat_name) {
   raw_val <- sapply(
     tune_list, 
     function(x) {
+      x <- x$result_summary
       x[x$summary_stat == stat_name, "fold_avg"]
     }
   )
   
-  val_range <- range(raw_val)
+  val_range <- range(raw_val, na.rm = T)
   if (stat_name == "Rsquared") {
     (raw_val - val_range[1])/(val_range[2] - val_range[1])
   } else {
@@ -490,22 +518,28 @@ best_summary_stat <-
                        tune_list = tune_list) %>%
       do.call(rbind, .) %>%
       colSums()
-    which.max(sum_list) %>% unlist()
+    result <- which.max(sum_list) %>% unlist()
+    if (!length(result)) return(1)
+    result
   }
 
 print.tune <- function(tune_obj) {
   cat(
-    "Model type: ", class(tune_obj$best_model), "\n\n", 
+    "Model type: ", class(tune_obj$model), "\n\n", 
     "Tuned parameters: ", "\n", 
     sapply(
-      names(tune_obj$best_param), 
+      names(tune_obj$param), 
       function(x) {
-        paste0("\t", x, ": ", tune_obj$best_param[[x]], "\n")
+        paste0("\t", x, ": ", tune_obj$param[[x]], "\n")
       }
     ), "\n",
+    "Number of predictors: ", length(tune_obj$pred_name), "\n", 
+    "Predictors (first 10): ", 
+    tune_obj$pred_name[1:(min(10, length(tune_obj$pred_name)))], 
+    "\n", "\n",
     "Model performance: ", "\n"
   )
-  print(tune_obj$best_result)
+  print(tune_obj$result_summary)
 }
 ```
 ```{r}
@@ -514,15 +548,15 @@ demo_qsarr_ntree <- tune(
   method = "rf", 
   df = demo, 
   resp = "dG", 
-  ignore_col = "guest", 
   nfold = 10,
-  nrep = 3,
+  nrep = 10,
+  ignore_col = "guest",
   ntree = c(200, 400, 800, 1100, 1500)
 )
 
 saveRDS(demo_qsarr_ntree, "model/rf/demo/qsarr_ntree.RDS")
 # No significant improvement in accuracy
-# Opting for 300 trees
+# Opting for 400 trees
 demo_qsarr <- tune(
   method = "rf", 
   df = demo, 
@@ -565,7 +599,7 @@ rfe_ctrl <- rfeControl(
   repeats = 10
 )
 demo_rfe <- rfe(
-  dG ~ ., 
+  dG ~ . - guest, 
   data = demo, 
   rfeControl = rfe_ctrl, 
   sizes = c(1, 4, 8, 16, 32, 64)
@@ -637,23 +671,31 @@ build_model.randomForest <- function(df,
                                      nfold = 10, 
                                      nrep = 1, 
                                      ignore_col = NA, 
-                                     rfe_ctrl = rfeControl(
-                                       functions = rfFuncs, 
-                                       method = "repeatedcv", 
-                                       repeats = 10
-                                     ),
+                                     rfe_ctrl,
                                      rfe_subset,
                                      ...) {
-  ignore_index <- which(names(df) %in% ignore_col)
-  if(length(ignore_index)) {
-    df <- df[, -ignore_index]
+  if (!is.na(ignore_col[1])) {
+    ignore_index <- which(names(df) %in% ignore_col)
+    if(length(ignore_index)) {
+      df <- df[, -ignore_index]
+    }
   }
+  
   
   # RFE
   if (missing(rfe_subset)) {
-    rfe_subset <- c(2^(0:9))
+    rfe_subset <- c(2^(0:6))
     rfe_subset <- rfe_subset[rfe_subset < ncol(df)]
   }
+  
+  # Create a generic rfeControl object if not provided
+  if (missing(rfe_ctrl)) {
+    rfe_ctrl <- rfeControl(
+      functions = rfFuncs,
+      method = "repeatedcv",
+      repeats = 10)
+  }
+  
   rfe_obj <- rfe(
     as.formula(paste0(resp, " ~ .")),
     data = df,
@@ -663,9 +705,7 @@ build_model.randomForest <- function(df,
 
   rfe_pred <- rfe_obj$optVariables
   df2 <- select(df, all_of(c(resp, rfe_pred)))
-  
-  df2 <- select(df, all_of(c(resp, rfe_pred)))
-  
+
   tune(
     method = "rf", 
     df = df2, 
@@ -698,26 +738,27 @@ cdk_rf <- lapply(
   cdk_list, 
   build_model, 
   model_method = "rf", 
-  df = demo, 
   resp = "dG", 
-  nfold = 10,
-  nrep = 5,
-  ntree = 300,
+  ignore_col = "guest",
+  nfold = 5,
+  nrep = 2,
+  ntree = 400,
   replace = c(T, F),
-  mtry = c(1, 2, 4, 8, 16),
-  maxnodes = c(NULL, 10, 20, 50)
+  mtry = c(1, 2, 4, 8)
 )
-dir.create("model/rf/cdk")
+
 cdk_rf_save <- lapply(
   names(cdk_rf), 
   function(x) {
     saveRDS(cdk_rf[[x]], paste0("model/rf/cdk/", x, ".RDS"))
   }
 )
-# saveRDS(cdk_rf, "model/rf/cdk.RDS")
+
 ```
 
 ## Other descriptor sources
+
+For the other descriptors, the columns `guest` was removed prior to analysis. However, this can also be accomplished using `ignore_col = "guest"`, as demonstrated in the analysis using the CDK models above.
 
 ```{r}
 padel_list <- read_desc_list(
@@ -732,26 +773,22 @@ padel_rf <- lapply(
   padel_list, 
   build_model, 
   model_method = "rf", 
-  df = demo, 
   resp = "dG", 
   nfold = 10,
   nrep = 10,
   ntree = 300,
-  replace = c(T, F),
-  mtry = c(2, 4, 8, 16, 32),
-  maxnodes = c(NULL, 10, 20, 50)
+  replace = c(T, F)
+  # mtry = c(1, 2, 4, 8, 12)
 )
-dir.create("model/rf/padel")
-cdk_rf_save <- lapply(
+
+padel_rf_save <- lapply(
   names(padel_rf), 
   function(x) {
     saveRDS(padel_rf[[x]], paste0("model/rf/padel/", x, ".RDS"))
   }
 )
-```
 
-```{r}
-set.seed(20210108)
+set.seed(20210111)
 mordred_list <- read_desc_list(
   list.files("preprocess/mordred", full.names = T), 
   quiet = T
@@ -764,16 +801,14 @@ mordred_rf <- lapply(
   mordred_list, 
   build_model, 
   model_method = "rf", 
-  df = demo, 
   resp = "dG", 
   nfold = 10,
   nrep = 10,
   ntree = 300,
   replace = c(T, F),
-  mtry = c(1, 2, 4, 8, 12),
-  maxnodes = c(NULL, 10, 20, 50)
+  mtry = c(1, 2, 4)
 )
-dir.create("model/rf/mordred")
+
 mordred_rf_save <- lapply(
   names(mordred_rf), 
   function(x) {
@@ -794,16 +829,21 @@ ochem_rf <- lapply(
   ochem_list, 
   build_model, 
   model_method = "rf", 
-  df = demo, 
   resp = "dG", 
   nfold = 10,
   nrep = 10,
-  ntree = 300,
+  # different rfe_ctrl due to number of descriptors
+  rfe_ctrl = rfeControl(
+    functions = rfFuncs,
+    method = "repeatedcv",
+    repeats = 5, 
+    number = 5
+  ),
+  ntree = 400,
   replace = c(T, F),
-  mtry = c(2, 4, 8, 16, 32),
-  maxnodes = c(NULL, 10, 20, 50)
+  mtry = c(1, 2, 4, 8, 12)
 )
-dir.create("model/rf/ochem")
+
 ochem_rf_save <- lapply(
   names(ochem_rf), 
   function(x) {
