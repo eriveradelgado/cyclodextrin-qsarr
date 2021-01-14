@@ -1,5 +1,5 @@
 ---
-title: "08. Random forest"
+title: "08. Random forest proof of concept"
 author: "Al Xin"
 date: "1/5/2021"
 output: html_document
@@ -28,10 +28,10 @@ library(randomForest)
 ```
 ```{r}
 if (!dir.exists("model")) dir.create("model")
-if (!dir.exists("model/rf")) dir.create("model/rf")
-if (!dir.exists("model/rf/demo")) {
+if (!dir.exists("model/rf_poc")) dir.create("model/rf_poc")
+if (!dir.exists("model/rf_poc/demo")) {
   dir_save <- sapply(
-    paste0("model/rf/"), 
+    paste0("model/rf_poc/"), 
     c("demo", "cdk", "mordred", "ochem", "padel")
   )  
 }
@@ -300,10 +300,10 @@ demo_ootb <- eval_model_rep(
 #            mutate(nrep = x)
 #        })
 
-saveRDS(demo_ootb, "model/rf/demo/ootb.RDS")
+saveRDS(demo_ootb, "model/rf_poc/demo/ootb.RDS")
 ```
 ```{r}
-demo_ootb <- readRDS("model/rf/demo/ootb.RDS")
+demo_ootb <- readRDS("model/rf_poc/demo/ootb.RDS")
 knitr::kable(demo_ootb, col.names = c("Measure", "Average", "Std. dev (all)", "Std. dev (repeats)"))
 ```
 
@@ -328,10 +328,10 @@ demo_caret_output <- train(
   method = "rf",
   trControl = demo_ctrl
 )
-saveRDS(demo_caret_output, "model/rf/demo/caret1.RDS")
+saveRDS(demo_caret_output, "model/rf_poc/demo/caret1.RDS")
 ```
 ``` {r}
-demo_caret_output <- readRDS("model/rf/demo/caret1.RDS")
+demo_caret_output <- readRDS("model/rf_poc/demo/caret1.RDS")
 print(demo_caret_output)
 ```
 
@@ -348,10 +348,10 @@ demo_caret <- eval_model_rep(
   mtry = 107, 
   ignore_col = "guest"
 )
-saveRDS(demo_caret, "model/rf/demo/caret2.RDS")
+saveRDS(demo_caret, "model/rf_poc/demo/caret2.RDS")
 ```
 ```{r}
-demo_caret <- readRDS("model/rf/demo/caret2.RDS")
+demo_caret <- readRDS("model/rf_poc/demo/caret2.RDS")
 knitr::kable(
   demo_caret, 
   col.names = c("Measure", "Average", "Std. dev. (all)", "Std. dev. (reps)")
@@ -554,7 +554,7 @@ demo_qsarr_ntree <- tune(
   ntree = c(200, 400, 800, 1100, 1500)
 )
 
-saveRDS(demo_qsarr_ntree, "model/rf/demo/qsarr_ntree.RDS")
+saveRDS(demo_qsarr_ntree, "model/rf_poc/demo/qsarr_ntree.RDS")
 # No significant improvement in accuracy
 # Opting for 400 trees
 demo_qsarr <- tune(
@@ -569,11 +569,11 @@ demo_qsarr <- tune(
   mtry = c(1, 10, 50, 90), 
   maxnodes = c(NULL, 10, 20, 50)
 )
-saveRDS(demo_qsarr, "model/rf/demo/qsarr.RDS")
+saveRDS(demo_qsarr, "model/rf_poc/demo/qsarr.RDS")
 ```
 
 ```{r}
-demo_qsarr <- readRDS("model/rf/demo/qsarr.RDS")
+demo_qsarr <- readRDS("model/rf_poc/demo/qsarr.RDS")
 print(demo_qsarr)
 # knitr::kable(
 #   demo_qsarr$best_result, 
@@ -604,7 +604,7 @@ demo_rfe <- rfe(
   rfeControl = rfe_ctrl, 
   sizes = c(1, 4, 8, 16, 32, 64)
 )
-saveRDS(demo_rfe, "model/rf/demo/rfe.RDS")
+saveRDS(demo_rfe, "model/rf_poc/demo/rfe.RDS")
 ```
 
 Using the defaults, with 10 repetitions of 10-fold cross-validation, we have that 16 variables are selected as providing optimal predictive power. 
@@ -612,7 +612,7 @@ Using the defaults, with 10 repetitions of 10-fold cross-validation, we have tha
 These 16 predictors will be used to create `demo2`
 
 ```{r}
-demo_rfe <- readRDS("model/rf/demo/rfe.RDS")
+demo_rfe <- readRDS("model/rf_poc/demo/rfe.RDS")
 print(demo_rfe)
 rfe_pred <- demo_rfe$optVariables
 demo2 <- select(demo, c(dG, rfe_pred))
@@ -633,7 +633,7 @@ demo2_qsarr <- tune(
   mtry = c(1, 2, 4, 8, 16), 
   maxnodes = c(NULL, 10, 20, 50)
 )
-saveRDS(demo2_qsarr, "model/rf/demo/qsarr_rfe.RDS")
+saveRDS(demo2_qsarr, "model/rf_poc/demo/qsarr_rfe.RDS")
 ```
 
 ```{r}
@@ -647,7 +647,7 @@ saveRDS(demo2_qsarr, "model/rf/demo/qsarr_rfe.RDS")
 #   maxnodes = 50, 
 #   simplify = F
 # )
-demo2_qsarr <- readRDS("model/rf/demo/qsarr_rfe.RDS")
+demo2_qsarr <- readRDS("model/rf_poc/demo/qsarr_rfe.RDS")
 print(demo2_qsarr)
 ```
 
@@ -750,7 +750,7 @@ cdk_rf <- lapply(
 cdk_rf_save <- lapply(
   names(cdk_rf), 
   function(x) {
-    saveRDS(cdk_rf[[x]], paste0("model/rf/cdk/", x, ".RDS"))
+    saveRDS(cdk_rf[[x]], paste0("model/rf_poc/cdk/", x, ".RDS"))
   }
 )
 
@@ -784,7 +784,7 @@ padel_rf <- lapply(
 padel_rf_save <- lapply(
   names(padel_rf), 
   function(x) {
-    saveRDS(padel_rf[[x]], paste0("model/rf/padel/", x, ".RDS"))
+    saveRDS(padel_rf[[x]], paste0("model/rf_poc/padel/", x, ".RDS"))
   }
 )
 
@@ -812,7 +812,7 @@ mordred_rf <- lapply(
 mordred_rf_save <- lapply(
   names(mordred_rf), 
   function(x) {
-    saveRDS(mordred_rf[[x]], paste0("model/rf/mordred/", x, ".RDS"))
+    saveRDS(mordred_rf[[x]], paste0("model/rf_poc/mordred/", x, ".RDS"))
   }
 )
 
@@ -847,7 +847,7 @@ ochem_rf <- lapply(
 ochem_rf_save <- lapply(
   names(ochem_rf), 
   function(x) {
-    saveRDS(ochem_rf[[x]], paste0("model/rf/ochem/", x, ".RDS"))
+    saveRDS(ochem_rf[[x]], paste0("model/rf_poc/ochem/", x, ".RDS"))
   }
 )
 ```

@@ -94,9 +94,28 @@ File: `07-preprocess.Rmd`
   - Use of algorithm discussed here: https://doi.org/10.1016/j.chemolab.2015.04.013
   - Assumptions of standard deviation of descriptors
   
-### 08. Random forest model
+### 08. Random forest proof of concept
 
-File: `08-rf.Rmd`
+File: `08-rf_poc.Rmd`
+
+- Building of a random forest
+- Model built on all variables as well as variables selected by `caret::rfe`
+- Tuning with new functions and existing `caret::train` functions
+- Analyzing model performance over repetitions
+- Decision that building models every time with RFE is too time intensive, leading to step 09
+- Models saved in `model/rf_pov/`
+
+### 09. Feature selection
+
+File: `09-rfe.Rmd`
+
+- Use of `caret::rfe` to select features
+- Running a single iteration with random forest functions only
+  - 10 repeats of 10-fold cross-validation
+- Requires multiple core processing to cut down on time
+- Top 16 variables saved
+- `"rfe"` objects saved in `rfe/`
+- Variables saved in `rfe_var/`
 
 ## Acknowledgements
 
