@@ -62,6 +62,7 @@ desc_list <- lapply(
 )
 
 names(desc_list) <- desc_src
+data_name <- names(desc_list[[1]])
 
 rfe_ctrl <- rfeControl(
   functions = rfFuncs,
@@ -71,8 +72,8 @@ rfe_ctrl <- rfeControl(
 )
 
 desc_name <- paste0(
-  unlist(lapply(desc_src, rep, length(desc_list[[1]]))), 
-  "/", rep(names(desc_list[[1]]), length(desc_list))
+  unlist(lapply(desc_src, rep, length(data_name))), 
+  "/", rep(data_name, length(desc_list))
 )
 desc_list <- unlist(desc_list, recursive = F)
 names(desc_list) <- desc_name
@@ -102,4 +103,52 @@ stopCluster(cl)
 
 ## Retrieving variables
 
+The top 16 variables over all the sets will be used. This number is mostly arbitrary, as it appears to be a number small enough such that each individual component can be explained while being large enough to contain information. 
+
+In future model building, both the entire set of predictors and the selected variables will be used. 
+
+```{r}
+rfe_list <- lapply(
+  paste0("rfe/", desc_src), 
+  function(x) {
+    lapply(
+      list.files(x, full.names = T), 
+      readRDS
+    )
+  }
+)
+
+rfe_var <- lapply(
+  rfe_list, 
+  function(x) {
+    lapply(
+      x, 
+      function(y) {
+        # Though dplyr::top_n works the same as arrange and slice, using the 
+        # two separate functions has the advantage that the relative order
+        # of the variables in the vector corresponds to the relative importance
+        y$variables %>%
+          group_by(var) %>%
+          summarize(importance = mean(Overall), .groups = "drop") %>%
+          arrange(desc(importance)) %>%
+          slice(1:16) %>%
+          .$var
+      }
+    )
+  }
+)
+
+# Renaming with the names of the data source make using these variables easier 
+rfe_var <- lapply(
+  rfe_var, 
+  setNames, 
+  nm = data_name
+)
+
+rfe_save <- lapply(
+  desc_src, 
+  function(x) saveRDS(rfe_var[[x]], paste0("rfe_var/", x, ".RDS"))
+)
+
+```
 
