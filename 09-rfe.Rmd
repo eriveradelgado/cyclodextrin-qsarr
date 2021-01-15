@@ -53,7 +53,9 @@ library(doParallel)
 
 Using `caret::rfeControl()`, the recursive feature elimination will be composed of 10 repeats of 10-fold cross-validation. 
 
-The data is read into a list of lists. In order to prevent an error from discarding progress, each element of the list will be saved independently. RFE also requires heavy computing resources, so parallel processing will be implemented with `parallel` and `doParallel`. 
+The data is read into a list of lists. In order to prevent an error from discarding progress, each element of the list will be saved independently. 
+
+<!-- RFE also requires heavy computing resources, so parallel processing will be implemented with `parallel` and `doParallel`.  -->
 
 ```{r rfe}
 # read data
