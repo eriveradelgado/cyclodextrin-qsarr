@@ -45,8 +45,8 @@ if (!dir.exists("rfe")) {
 ```{r dependencies}
 library(caret)
 library(qsarr)
-library(parallel)
-library(doParallel)
+# library(parallel)
+# library(doParallel)
 ```
 
 ## Running recursive feature elimination
@@ -83,13 +83,13 @@ desc_name <- paste0(
 desc_list <- unlist(desc_list, recursive = F)
 names(desc_list) <- desc_name
 
-# Parallel processing setup
-num_core <- detectCores()
-# Subtracting 2 from total cores prevents R from using all system resources
-if (num_core > 2) num_core <- num_core - 2
-
-cl <- makeCluster(num_core)
-registerDoParallel(cl)
+# # Parallel processing setup
+# num_core <- detectCores()
+# # Subtracting 2 from total cores prevents R from using all system resources
+# if (num_core > 2) num_core <- num_core - 2
+# 
+# cl <- makeCluster(num_core)
+# registerDoParallel(cl)
 
 set.seed(20210113)
 desc_rfe <- lapply(
@@ -103,7 +103,7 @@ desc_rfe <- lapply(
     saveRDS(rfe_obj, paste0("rfe/obj/", x, ".RDS"))
   }
 )
-stopCluster(cl)
+# stopCluster(cl)
 ```
 
 ## Retrieving variables
