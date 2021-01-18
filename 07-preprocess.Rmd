@@ -22,8 +22,9 @@ Because this step is time-consuming, the default action for the chunks has been 
 
 ```{r dir_create}
 # Create appropriate directories
-pp_dir <- paste0("preprocess/", list.files("desc", include.dirs = T)) 
-ad_dir <- paste0("ad/", list.files("desc", include.dirs = T))
+desc_name <- c("cdk", "mordred", "ochem", "padel")
+pp_dir <- paste0("preprocess/", desc_name) 
+ad_dir <- paste0("ad/", desc_name)
 if (!dir.exists("preprocess")) dir.create("preprocess")
 if (!dir.exists(pp_dir[1])) lapply(pp_dir, dir.create)
 if (!dir.exists("ad")) dir.create("ad")
@@ -229,7 +230,7 @@ ad_list <- list(cdk_ad, pp_ad) %>%
   unlist(recursive = F) %>%
   setNames(
     paste0(
-      sapply(c("cdk", "mordred", "ochem", "padel"), rep, length(cdk_ad)), 
+      sapply(desc_name, rep, length(cdk_ad)), 
       "/", names(cdk_ad)
     )
   )
@@ -243,6 +244,245 @@ ad_save <- sapply(
   }
 )
 ```
+
+## Preprocessing external validation data
+
+```{r}
+desc_name <- c("cdk", "mordred", "ochem", "padel")
+data_name <- str_remove(list.files("desc/cdk"), "\\.RDS$")
+evpp_dir <- paste0("extval_pp/", desc_name)
+ev_dir <- paste0("extval/", desc_name)
+if (!dir.exists("extval_pp")) dir.create("extval_pp")
+if (!dir.exists(ev_dir[1])) lapply(evpp_dir, dir.create)
+```
+
+### Determining molecules outside applicability domain
+
+To simulate the process of applying models, the applicability domain objects and
+external validation sets are read from the appropriate directories. 
+
+Though molecules outside of the applicability domain can be removed with
+`qsarr::remove_ad()`, they will be retained in this case to evaluate model 
+performance. The results of the applicability domain analysis will be saved as
+a boolean column `in_ad`.
+
+```{r}
+ad_list <- lapply(
+  ad_dir, 
+  function(x) {
+    ad_sublist <- lapply(
+      list.files(x, full.names = T), 
+      readRDS
+    ) %>%
+      setNames(nm = data_name)
+  }
+) %>%
+  setNames(nm = desc_name)
+
+ev_list <- lapply(
+  ev_dir, 
+  function(x) {
+    ev_sublist <- lapply(
+      list.files(x, full.names = T), 
+      readRDS
+    ) %>%
+      setNames(nm = data_name)
+  }
+) %>%
+  setNames(nm = desc_name)
+
+evpp_list <- lapply(
+  desc_name, 
+  function(x) {
+    ad_sublist <- ad_list[[x]]
+    ev_sublist <- ev_list[[x]]
+    lapply(
+      data_name, 
+      function(y) {
+        mutate(
+          ev_sublist[[y]], 
+          in_ad = predict(ad_sublist[[y]], ev_sublist[[y]])
+        )
+      }
+    ) %>%
+      setNames(data_name)
+  }
+) %>% 
+  setNames(desc_name)
+```
+
+After creating the boolean column for the applicability domain, the data can be
+centered and scaled with the applicability domain objects. Because the objects
+were created after removing variables with near zero variance, this step also
+implicitly removes low-variance variables as well.
+
+```{r}
+evpp_list <- lapply(
+  desc_name, 
+  function(x) {
+    ad_sublist <- ad_list[[x]]
+    ev_sublist <- evpp_list[[x]]
+    lapply(
+      data_name, 
+      function(y) {
+        center_scale(
+          df = ev_sublist[[y]], 
+          ignore_col = c("guest", "dG", "in_ad"), 
+          return_ad = F, 
+          ad_obj = ad_sublist[[y]]
+        )
+      }
+    ) %>%
+      setNames(data_name)
+  }
+) %>% 
+  setNames(desc_name)
+```
+
+The data in the above list can then be saved in the directory using the same 
+naming convention as before.
+
+```{r ev_save}
+evpp_list <- evpp_list %>% 
+  unlist(recursive = F) %>%
+  setNames(
+    paste0(
+      sapply(desc_name, rep, length(data_name)), 
+      "/", data_name
+    )
+  )
+
+evpp_save <- sapply(
+  names(evpp_list), 
+  function(x) {
+    saveRDS(evpp_list[[x]], paste0("extval_pp/", x, ".RDS"))
+  }
+)
+```
+
+
+```{r}
+predict.ad <- function(ad, df, msg = F, ...) {
+  if (!is.na(ad$ignore_col[1])) {
+    ignore_index <- which(names(df) %in% ad$ignore_col)
+    if (length(ignore_index)) df <- df[, -ignore_index]
+  }
+
+  if (msg) {
+    if (ncol(df) > length(ad$x_mean)) {
+      message(
+        "There are ", ncol(df) - length(ad$x_mean), " more predictors ",
+        "in the data frame compared to the applicability domain"
+      )
+    }
+  }
+
+  # Slightly different that previous error check
+  # If predictors in the ad object are not present in the data frame, this is a
+  # critical issue that prevents evaluation of the applicability domain
+  if (sum(names(ad$x_mean) %in% names(df)) < length(ad$x_mean)) {
+    message(
+      "Predictors in the applicability domain are missing from the data", "\n",
+      "Prediction cannot proceed; exiting with NA"
+    )
+    return(NA)
+  }
+
+  std_df <- lapply(
+    names(ad$x_mean),
+    function(x) {
+      x_mean <- ad$x_mean[x]
+      x_sd <- ad$x_sd[x]
+      abs(df[, x] - x_mean) / x_sd
+    }
+  ) %>%
+    data.frame()
+
+  # Apply a function rowwise
+  # returns T if inside domain
+  sapply(
+    1:nrow(std_df),
+    function(x) {
+      x <- std_df[x, ] %>% as.numeric()
+      if (min(x, na.rm = T) > 3) F
+      if (max(x, na.rm = T) < 3) T
+      s_new <- mean(x, na.rm = T) + 1.28 * sd_pop(x)
+      ifelse(s_new < 3, T, F)
+    }
+  )
+}
+
+center_scale <-
+  function(df,
+           ignore_col = NA,
+           return_ad = F,
+           ad_obj = NA,
+           quiet = T,
+           ...) {
+  if (!is.na(ignore_col[1])) {
+    ignore_index <- which(names(df) %in% ignore_col)
+    df_retain <- df[, ignore_index]
+    df <- df[, -ignore_index]
+  }
+
+  # Centering and scaling
+  # Uses an applicability domain object with `ad()`
+  if (is.na(ad_obj)[1]) {
+    ad_obj <- ad(df, ignore_col = ignore_col)
+  }
+
+
+  if (!quiet) {
+    if (ncol(df) > length(ad_obj$x_mean)) {
+      message(
+        "There are ", ncol(df) - length(ad_obj$x_mean), " more predictors ",
+        "in the data frame compared to the applicability domain", "\n",
+        "Consider ignoring columns with `ignore_col =`", "\n",
+        "Only retaining predictors specified in applicability domain"
+      )
+    }
+  }
+
+  # Slightly different that previous error check
+  # If predictors in the ad object are not present in the data frame, this is a
+  # critical issue that prevents evaluation of the applicability domain
+  if (sum(names(ad_obj$x_mean) %in% names(df)) < length(ad_obj$x_mean)) {
+    message(
+      "Predictors in the applicability domain are missing from the data", "\n",
+      "Prediction cannot proceed; exiting with NA"
+    )
+    return(NA)
+  }
+    
+  cs_df <- lapply(
+    names(ad_obj$x_mean),
+    function(x) (df[, x] - ad_obj$x_mean[x]) / ad_obj$x_sd[x]
+    ) %>%
+    data.frame() %>%
+    setNames(names(ad_obj$x_mean))
+
+  # replace all NAs with the mean (0)
+  cs_df <- lapply(
+    cs_df,
+    function(x) {
+      x[is.na(x)] <- 0
+      x
+    }
+  ) %>%
+    data.frame()
+
+  if (return_ad) {
+    list(
+      df = data.frame(df_retain, cs_df),
+      ad = ad_obj
+    )
+  } else {
+    data.frame(df_retain, cs_df)
+  }
+}
+
+```
+
 
 
 [^1]: Kunal roy, Supratik Kar, Pravin Ambure (2015). Chemocetrics and Intelligent Laboratory Systems, https://doi.org/10.1016/j.chemolab.2015.04.013
