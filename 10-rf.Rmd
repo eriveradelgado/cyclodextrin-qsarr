@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = F)
 ```
 
 ## Overview
@@ -38,9 +38,14 @@ library(dplyr)
 # library(tibble)
 # library(tidyr)
 library(qsarr)
+library(stringr)
+library(tidyverse)
 # library(randomForest)
 library(parallel)
 library(doParallel)
+
+theme_set(theme_bw())
+
 ```
 
 ## All variables
@@ -313,4 +318,162 @@ ochem_rfe_save <- lapply(
 
 ## External validation
 
+```{r}
+desc_name <- c("cdk", "mordred", "ochem", "padel")
+data_name <- str_remove(list.files("desc/cdk"), "\\.RDS$")
+```
+```{r}
+ev_list <- lapply(
+  paste0("extval_pp/", desc_name), 
+  function(x) {
+    lapply(
+      list.files(x, full.names = T), 
+      readRDS
+    ) %>%
+      setNames(nm = data_name)
+  }
+) %>%
+  setNames(nm = desc_name)
+```
+```{r}
+rf_allvar <- lapply(
+  paste0("model/rf/all_var/", desc_name), 
+  function(x) {
+    lapply(
+      list.files(x, full.names = T), 
+      readRDS
+    ) %>%
+      setNames(nm = data_name)
+  }
+) %>%
+  setNames(nm = desc_name)
+
+ev_allvar <- lapply(
+  desc_name, 
+  function(x) {
+    tune_sublist <- rf_allvar[[x]]
+    ev_sublist <- ev_list[[x]]
+    lapply(
+      data_name, 
+      function(y) {
+        pred <- predict(tune_sublist[[y]], ev_sublist[[y]])
+        data.frame(
+          guest = ev_sublist[[y]]$dG, 
+          in_ad = ev_sublist[[y]]$in_ad,
+          obs = ev_sublist[[y]]$dG, 
+          pred = pred
+        )
+      }
+    ) %>%
+      setNames(data_name)
+  }
+) %>% 
+  setNames(desc_name)
+
+# All results, regardless of applicability domain
+ev_allvar_result <- lapply(
+  ev_allvar, 
+  function(x) {
+    lapply(
+      x, 
+      defaultSummary
+    ) %>%
+      setNames(data_name)
+  }
+) %>%
+  setNames(desc_name)
+
+# Accuracy only on applicability domain
+ev_allvar_result_ad <- lapply(
+  ev_allvar, 
+  function(x) {
+    lapply(
+      x, 
+      function(y) {
+        y <- y[y$in_ad, ]
+        defaultSummary(y)
+      }
+    ) %>%
+      setNames(data_name)
+  }
+) %>% 
+  setNames(desc_name)
+
+ev_allvar_df <- data.table::rbindlist(
+  lapply(
+    unlist(ev_allvar_result, recursive = F), 
+    function(x) {
+      data.frame(as.list(x))
+    }
+  )
+) %>%
+  data.frame(
+    desc_src = unlist(lapply(desc_name, rep, length(data_name))), 
+    data_src = rep(data_name, length(desc_name))
+  ) %>%
+  pivot_longer(RMSE:MAE, names_to = "summary_stat")
+
+ev_allvar_ad_df <- data.table::rbindlist(
+  lapply(
+    unlist(ev_allvar_result_ad, recursive = F), 
+    function(x) {
+      data.frame(as.list(x))
+    }
+  )
+) %>%
+  data.frame(
+    desc_src = unlist(lapply(desc_name, rep, length(data_name))), 
+    data_src = rep(data_name, length(desc_name))
+  ) %>%
+  pivot_longer(RMSE:MAE, names_to = "summary_stat")
+
+ggplot(ev_allvar_df, aes(x = data_src, y = value, fill = desc_src)) + 
+  geom_col(position = "dodge") + 
+  facet_grid(summary_stat ~ ., scales = "free")
+
+ggplot(ev_allvar_ad_df, aes(x = data_src, y = value, fill = desc_src)) + 
+  geom_col(position = "dodge") + 
+  facet_grid(summary_stat ~ ., scales = "free")
+# rf_tst <- rf_allvar[[1]]
+# ev_tst <- ev_list[[1]]
+# pred_tst <- lapply(
+#   names(rf_tst), 
+#   function(x) {
+#     # rf_model <- rf_tst[[x]]$model
+#     # predict(rf_model, ev_tst[[x]])
+#     predict(rf_tst[[x]], ev_tst[[x]])
+#   }
+# )
+```
+
+```{r}
+# print.tune <- function(tune_obj) {
+#   cat(
+#     "Model type: ", class(tune_obj$model), "\n\n",
+#     "Tuned parameters: ", "\n",
+#     sapply(
+#       names(tune_obj$param),
+#       function(x) {
+#         paste0("\t", x, ": ", tune_obj$param[[x]], "\n")
+#       }
+#     ), "\n",
+#     "Number of predictors: ", length(tune_obj$pred_name), "\n",
+#     "Predictors (first 10): ",
+#     tune_obj$pred_name[1:(min(10, length(tune_obj$pred_name)))],
+#     "\n", "\n",
+#     "Model performance: ", "\n"
+#   )
+#   print(tune_obj$result_summary)
+# }
+# 
+# predict.tune <- function(tune_obj, ...) {
+#   # if (length(class(tune_obj$model)) > 1) {
+#   #   class(tune_obj$model) <-
+#   #     class(tune_obj$model)[length(class(tune_obj$model))]
+#   # }
+#   # best_model <- tune_obj$model
+#   # UseMethod("predict", best_model)
+#   predict(tune_obj$model, ...)
+# }
+```
 
