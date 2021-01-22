@@ -10,7 +10,7 @@ Overall, the workflow can be followed by running the R Markdown files in order. 
 
 ### 00. Downloading experimental observations
 
-File: `00-dwnld.Rmd`
+File: [`00-dwnld.Rmd`](00-dwnld.html)
 
 - Downloads data from Rekharsky and Inoue (1997), Suzuki (2001), and Singh et al (2015)
 - Converted Singh data from constant of association to Gibbs free energy change
@@ -21,7 +21,7 @@ File: `00-dwnld.Rmd`
 
 ### 01. Cleaning experimental observations
 
-File: `01-clean.Rmd`
+File: [`01-clean.Rmd`](01-clean.html)
 
 - Removed special or unconventional characters
 - Cleaned by solvent conditions
@@ -31,7 +31,7 @@ File: `01-clean.Rmd`
 
 ### 02. Downloading ligand structures as SDFs
 
-File: `02-sdf.Rmd`
+File: [`02-sdf.Rmd`](02-sdf.html)
 
 - Structure data files (SDFs) downloaded into `sdf/`
   - Subdirectories for each data source
@@ -44,7 +44,7 @@ File: `02-sdf.Rmd`
 
 ### 03. Calculating chemical descriptors using CDK for R
 
-File: `03-cdk.Rmd`
+File: [`03-cdk.Rmd`](03-cdk.html)
 
 - Using package `rcdk` to obtain chemical descriptors
   - https://cran.r-project.org/web/packages/rcdk/vignettes/using-rcdk.html
@@ -54,7 +54,7 @@ File: `03-cdk.Rmd`
 
 ### 04. Other sources for chemical descriptors
 
-File: `04-desc_external.Rmd`
+File: [`04-desc_external.Rmd`](04-desc_external.html)
 
 - Incorporation of descriptors from other sources
 - PaDEL-Descriptor
@@ -66,7 +66,7 @@ File: `04-desc_external.Rmd`
 
 ### 05. Joining affinity data to descriptors
 
-File: `05-join.Rmd`
+File: [`05-join.Rmd`](05-join.html)
 
 - Combining affinity data and the descriptors
 - Requires addition of guest names for OCHEM and Mordred descriptors
@@ -74,7 +74,7 @@ File: `05-join.Rmd`
 
 ### 06. Creating external validation sets
 
-File: `06-extval.Rmd`
+File: [`06-extval.Rmd`](06-extval.html)
 
 - 15% of the data is set aside for external validation
 - Data for external validation in directory `extval/`
@@ -82,7 +82,7 @@ File: `06-extval.Rmd`
   
 ### 07. Preprocessing chemical descriptors
 
-File: `07-preprocess.Rmd`
+File: [`07-preprocess.Rmd`](07-preprocess.html)
 
 - Common preprocessing functions applied to data
   - Centering and scaling
@@ -96,7 +96,7 @@ File: `07-preprocess.Rmd`
   
 ### 08. Random forest proof of concept
 
-File: `08-rf_poc.Rmd`
+File: [`08-rf_poc.Rmd`](08-rf_poc.html)
 
 - Building of a random forest
 - Model built on all variables as well as variables selected by `caret::rfe`
@@ -107,7 +107,7 @@ File: `08-rf_poc.Rmd`
 
 ### 09. Feature selection
 
-File: `09-rfe.Rmd`
+File: [`09-rfe.Rmd`](09-rfe.html)
 
 - Use of `caret::rfe` to select features
 - Running a single iteration with random forest functions only
@@ -116,6 +116,18 @@ File: `09-rfe.Rmd`
 - Top 16 variables saved
 - `"rfe"` objects saved in `rfe/`
 - Variables saved in `rfe_var/`
+
+### 10. Random forest
+
+File: [`10-rf.Rmd`](10-rf.html)
+
+- Random forest model built
+- Tuning for two sets of variables: full variable set and selected variables
+- Results from 10 repeats of 10-fold cross-validation
+
+## Notes on workflow
+
+Because the data sources already completed screening of molecule names, there was no cleaning step to verify uniqueness of all ligands. In the future, this would be an appropriate step to take in order to curate the data.
 
 ## Acknowledgements
 
