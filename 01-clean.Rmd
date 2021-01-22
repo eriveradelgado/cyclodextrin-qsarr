@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = F)
 if (!require(pacman)) install.packages("pacman")
 library(pacman)
 ```
@@ -20,10 +20,13 @@ In this step, typos will be removed and the conditions for the experimental data
 Packages needed in this step include `data.table`, `dplyr`, `stringr`, and `tidyr`. Additionally, a personal function from `qsarr` for regular expressions is also used. 
 
 ```{r packages, message = F, warning = F}
-p_load(data.table, dplyr, stringr, tidyr)
 if(!dir.exists("affinity/clean")) dir.create("affinity/clean")
-devtools::install_github("awqx/qsarr")
+# devtools::install_github("awqx/qsarr")
 library(qsarr)
+library(data.table)
+library(dplyr)
+library(stringr)
+library(tidyr)
 ```
 
 ## Rekharsky and Inoue dataset

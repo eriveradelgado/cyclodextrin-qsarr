@@ -45,7 +45,6 @@ library(parallel)
 library(doParallel)
 
 theme_set(theme_bw())
-
 ```
 
 ## All variables
@@ -293,7 +292,6 @@ mordred_rfe_save <- lapply(
   }
 )
 
-
 ochem_rfe <- lapply(
   ochem_list_rfe, 
   tune, 
@@ -322,6 +320,9 @@ ochem_rfe_save <- lapply(
 desc_name <- c("cdk", "mordred", "ochem", "padel")
 data_name <- str_remove(list.files("desc/cdk"), "\\.RDS$")
 ```
+
+First, the data generated from Step 07 is read into a list.
+
 ```{r}
 ev_list <- lapply(
   paste0("extval_pp/", desc_name), 
@@ -335,6 +336,11 @@ ev_list <- lapply(
 ) %>%
   setNames(nm = desc_name)
 ```
+
+### Models using all variables
+
+There are two model-building methods. First, random forests were generated based on all the available variables. 
+
 ```{r}
 rf_allvar <- lapply(
   paste0("model/rf/all_var/", desc_name), 
@@ -347,7 +353,12 @@ rf_allvar <- lapply(
   }
 ) %>%
   setNames(nm = desc_name)
+```
 
+
+The results on external validation data are loaded below. 
+
+```{r}
 ev_allvar <- lapply(
   desc_name, 
   function(x) {
@@ -358,7 +369,7 @@ ev_allvar <- lapply(
       function(y) {
         pred <- predict(tune_sublist[[y]], ev_sublist[[y]])
         data.frame(
-          guest = ev_sublist[[y]]$dG, 
+          guest = ev_sublist[[y]]$guest, 
           in_ad = ev_sublist[[y]]$in_ad,
           obs = ev_sublist[[y]]$dG, 
           pred = pred
