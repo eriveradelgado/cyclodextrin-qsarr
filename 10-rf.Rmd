@@ -1,5 +1,5 @@
 ---
-title: "08. Random forest proof of concept"
+title: "10. Random forest"
 author: "Al Xin"
 date: "1/5/2021"
 output: html_document
@@ -22,8 +22,8 @@ if (!dir.exists("model/rf")) {
   dir.create("model/rf")
   dir.create("model/rf/all_var")
   dir.create("model/rf/rfe_var")
-  dir_create_result <- sapply(paste0("model/rf/all_var/", desc_src), dir.create)  
-  dir_create_result <- sapply(paste0("model/rf/rfe_var/", desc_src), dir.create)  
+  dir_create_result <- sapply(paste0("model/rf/all_var/", desc_src), dir.create)
+  dir_create_result <- sapply(paste0("model/rf/rfe_var/", desc_src), dir.create)
 }
 ```
 
@@ -32,15 +32,22 @@ if (!dir.exists("model/rf")) {
 ## Dependencies
 
 ```{r package}
-# library(caret)
-library(dplyr)
-# # library(stringr)
-# library(tibble)
-# library(tidyr)
+remove.packages("qsarr") # fresh install due to updates
+if (!require("devtools")) install.packages("devtools")
+devtools::install_github("awqx/qsarr")
 library(qsarr)
-library(stringr)
-library(tidyverse)
-# library(randomForest)
+
+# # These packages should be loaded automatically by `qsarr`
+# library(caret)
+# library(data.table)
+# library(dplyr)
+# # # library(stringr)
+# # library(tibble)
+# # library(tidyr)
+# library(qsarr)
+# library(stringr)
+# library(tidyverse)
+# # library(randomForest)
 library(parallel)
 library(doParallel)
 
@@ -91,26 +98,6 @@ cl_lib <- clusterEvalQ(cl, library("qsarr"))
 # cl_lib <- clusterEvalQ(cl, library("randomForest"))
 clusterSetRNGStream(cl = cl, 20210116)
 
-# library(caret)
-# library(dplyr)
-# library(tibble)
-# library(tidyr)
-# library(qsarr)
-# library(randomForest)
-# library(parallel)
-# library(doParallel)
-# clusterExport(
-#   cl = cl, 
-#   varlist = c(
-#     "tune", 
-#     "tune.randomForest", 
-#     "tune_helper",
-#     "best_summary_stat", 
-#     "eval_model", 
-#     "eval_model_rep", 
-#     "normalize_"
-#   )
-# )
 cdk_all <- parLapply(
   cl = cl,
   cdk_list, 
@@ -355,8 +342,7 @@ rf_allvar <- lapply(
   setNames(nm = desc_name)
 ```
 
-
-The results on external validation data are loaded below. 
+The results on external validation data can then be predicted. Both the results on all molecules as well as only molecules within the applicability domain are calculated. 
 
 ```{r}
 ev_allvar <- lapply(
@@ -409,7 +395,155 @@ ev_allvar_result_ad <- lapply(
   }
 ) %>% 
   setNames(desc_name)
+```
 
+The same procedure for prediction is carried out with models only built on variables selected with RFE. 
+
+```{r}
+rf_rfe <- lapply(
+  paste0("model/rf/rfe_var/", desc_name), 
+  function(x) {
+    lapply(
+      list.files(x, full.names = T), 
+      readRDS
+    ) %>%
+      setNames(nm = data_name)
+  }
+) %>%
+  setNames(nm = desc_name)
+
+ev_rfe <- lapply(
+  desc_name, 
+  function(x) {
+    tune_sublist <- rf_rfe[[x]]
+    ev_sublist <- ev_list[[x]]
+    lapply(
+      data_name, 
+      function(y) {
+        pred <- predict(tune_sublist[[y]], ev_sublist[[y]])
+        data.frame(
+          guest = ev_sublist[[y]]$guest, 
+          in_ad = ev_sublist[[y]]$in_ad,
+          obs = ev_sublist[[y]]$dG, 
+          pred = pred
+        )
+      }
+    ) %>%
+      setNames(data_name)
+  }
+) %>% 
+  setNames(desc_name)
+
+# All results, regardless of applicability domain
+ev_rfe_result <- lapply(
+  ev_rfe, 
+  function(x) {
+    lapply(
+      x, 
+      defaultSummary
+    ) %>%
+      setNames(data_name)
+  }
+) %>%
+  setNames(desc_name)
+
+# Accuracy only on applicability domain
+ev_rfe_result_ad <- lapply(
+  ev_rfe, 
+  function(x) {
+    lapply(
+      x, 
+      function(y) {
+        y <- y[y$in_ad, ]
+        defaultSummary(y)
+      }
+    ) %>%
+      setNames(data_name)
+  }
+) %>% 
+  setNames(desc_name)
+```
+
+## Results
+
+### Model-building process
+
+The results are first read from the lists generated from tuning and saved in the
+directory `result/trn/`.
+
+```{r}
+dir.create("result/trn/all_var", recursive = T)
+dir.create("result/trn/rfe_var")
+
+rf_allvar_df <- rbindlist(
+  lapply(
+    desc_name, 
+    function(x) {
+      desc_list <- rf_allvar[[x]]
+      rbindlist(
+        lapply(
+          data_name, 
+          function(y) {
+            mutate(desc_list[[y]]$result_summary, data_src = y)
+          }
+        )
+      ) %>%
+        mutate(desc_src = x)
+    }
+  )
+) 
+
+rf_rfe_df <- rbindlist(
+  lapply(
+    desc_name, 
+    function(x) {
+      desc_list <- rf_rfe[[x]]
+      rbindlist(
+        lapply(
+          data_name, 
+          function(y) {
+            mutate(desc_list[[y]]$result_summary, data_src = y)
+          }
+        )
+      ) %>%
+        mutate(desc_src = x)
+    }
+  )
+) 
+
+saveRDS(rf_allvar_df, "result/trn/all_var/rf.RDS")
+saveRDS(rf_rfe_df, "result/trn/rfe_var/rf.RDS")
+```
+```{r, eval = T, echo = F}
+if (!dir.exists("result")) {
+  rf_allvar_df <- readRDS("result/trn/all_var/rf.RDS")
+  rf_rfe_df <- readRDS("result/trn/rfe_var/rf.RDS")
+}
+
+ggplot(rf_allvar_df, aes(x = data_src, y = fold_avg, fill = desc_src)) + 
+  geom_col(position = "dodge") + 
+  facet_grid(summary_stat ~ ., scales = "free") + 
+  labs(
+    x = "Data source", 
+    y = "Average value over repeated 10-fold CV", 
+    title = "Results for random forest models on all variables", 
+    fill = "Chemical descriptor"
+  )
+
+ggplot(rf_rfe_df, aes(x = data_src, y = fold_avg, fill = desc_src)) + 
+  geom_col(position = "dodge") + 
+  facet_grid(summary_stat ~ ., scales = "free") + 
+  labs(
+    x = "Data source", 
+    y = "Average value over repeated 10-fold CV", 
+    title = "Results for random forest models on RFE-selected variables", 
+    fill = "Chemical descriptor"
+  )
+```
+
+### External validation 
+
+```{r}
 ev_allvar_df <- data.table::rbindlist(
   lapply(
     unlist(ev_allvar_result, recursive = F), 
@@ -455,36 +589,5 @@ ggplot(ev_allvar_ad_df, aes(x = data_src, y = value, fill = desc_src)) +
 #     predict(rf_tst[[x]], ev_tst[[x]])
 #   }
 # )
-```
-
-```{r}
-# print.tune <- function(tune_obj) {
-#   cat(
-#     "Model type: ", class(tune_obj$model), "\n\n",
-#     "Tuned parameters: ", "\n",
-#     sapply(
-#       names(tune_obj$param),
-#       function(x) {
-#         paste0("\t", x, ": ", tune_obj$param[[x]], "\n")
-#       }
-#     ), "\n",
-#     "Number of predictors: ", length(tune_obj$pred_name), "\n",
-#     "Predictors (first 10): ",
-#     tune_obj$pred_name[1:(min(10, length(tune_obj$pred_name)))],
-#     "\n", "\n",
-#     "Model performance: ", "\n"
-#   )
-#   print(tune_obj$result_summary)
-# }
-# 
-# predict.tune <- function(tune_obj, ...) {
-#   # if (length(class(tune_obj$model)) > 1) {
-#   #   class(tune_obj$model) <-
-#   #     class(tune_obj$model)[length(class(tune_obj$model))]
-#   # }
-#   # best_model <- tune_obj$model
-#   # UseMethod("predict", best_model)
-#   predict(tune_obj$model, ...)
-# }
 ```
 
