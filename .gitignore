@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 *.log
+*.html
 /sdf/ri/
 /sdf/riss/
 /sdf/singh/

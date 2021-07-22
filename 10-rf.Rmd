@@ -5,7 +5,18 @@ date: "1/5/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, eval = T}
+library(pacman)
+p_load(
+  caret,
+  data.table,
+  dplyr, 
+  ggplot2, 
+  qsarr,
+  stringr, 
+  tidyr
+)
+theme_set(theme_bw())
 knitr::opts_chunk$set(echo = TRUE, eval = F)
 ```
 
@@ -35,23 +46,9 @@ if (!dir.exists("model/rf")) {
 remove.packages("qsarr") # fresh install due to updates
 if (!require("devtools")) install.packages("devtools")
 devtools::install_github("awqx/qsarr")
-library(qsarr)
 
-# # These packages should be loaded automatically by `qsarr`
-# library(caret)
-# library(data.table)
-# library(dplyr)
-# # # library(stringr)
-# # library(tibble)
-# # library(tidyr)
-# library(qsarr)
-# library(stringr)
-# library(tidyverse)
-# # library(randomForest)
 library(parallel)
 library(doParallel)
-
-theme_set(theme_bw())
 ```
 
 ## All variables
@@ -188,6 +185,9 @@ ochem_all_save <- lapply(
 
 stopCluster(cl = cl)
 ```
+
+### RFE Variables
+
 ```{r rfe}
 # Read preprocessed descriptors
 # Remove guest names for training
@@ -303,10 +303,19 @@ ochem_rfe_save <- lapply(
 
 ## External validation
 
-```{r}
+```{r, eval = T}
+knitr::opts_chunk$set(eval = T)
 desc_name <- c("cdk", "mordred", "ochem", "padel")
 data_name <- str_remove(list.files("desc/cdk"), "\\.RDS$")
 ```
+
+```{r, echo = F}
+predict.tune <- function(tune_obj, ...) 
+{
+  predict(tune_obj$model, ...)
+}
+```
+
 
 First, the data generated from Step 07 is read into a list.
 
@@ -472,8 +481,11 @@ The results are first read from the lists generated from tuning and saved in the
 directory `result/trn/`.
 
 ```{r}
-dir.create("result/trn/all_var", recursive = T)
-dir.create("result/trn/rfe_var")
+if (!dir.exists("result/trn")) {
+  dir.create("result/trn/all_var", recursive = T)
+  dir.create("result/trn/rfe_var")  
+}
+
 
 rf_allvar_df <- rbindlist(
   lapply(
@@ -515,13 +527,15 @@ saveRDS(rf_allvar_df, "result/trn/all_var/rf.RDS")
 saveRDS(rf_rfe_df, "result/trn/rfe_var/rf.RDS")
 ```
 ```{r, eval = T, echo = F}
-if (!dir.exists("result")) {
-  rf_allvar_df <- readRDS("result/trn/all_var/rf.RDS")
-  rf_rfe_df <- readRDS("result/trn/rfe_var/rf.RDS")
-}
+rf_allvar_df <- readRDS("result/trn/all_var/rf.RDS")
+rf_rfe_df <- readRDS("result/trn/rfe_var/rf.RDS")
 
 ggplot(rf_allvar_df, aes(x = data_src, y = fold_avg, fill = desc_src)) + 
   geom_col(position = "dodge") + 
+  geom_errorbar(
+    aes(ymin = fold_avg - fold_sd, ymax = fold_avg + fold_sd), 
+    width = .2,
+    position = position_dodge(.9)) + 
   facet_grid(summary_stat ~ ., scales = "free") + 
   labs(
     x = "Data source", 
@@ -532,6 +546,10 @@ ggplot(rf_allvar_df, aes(x = data_src, y = fold_avg, fill = desc_src)) +
 
 ggplot(rf_rfe_df, aes(x = data_src, y = fold_avg, fill = desc_src)) + 
   geom_col(position = "dodge") + 
+  geom_errorbar(
+    aes(ymin = fold_avg - fold_sd, ymax = fold_avg + fold_sd), 
+    width = .2,
+    position = position_dodge(.9)) +
   facet_grid(summary_stat ~ ., scales = "free") + 
   labs(
     x = "Data source", 
