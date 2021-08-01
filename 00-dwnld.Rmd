@@ -31,8 +31,12 @@ Raw data will be stored in `affinity/raw`. Data that has been cast into an R dat
 
 ```{r packages, message = F, warning = F, results = "hide"}
 packages <- c("data.table", "dplyr", "httr", "stringr", "tabulizer", "XML")
-# mapply(install.packages, packages)
+mapply(install.packages, packages)
 lapply(packages, library, character.only = T)
+```
+
+
+```{r packages, message = F, warning = F, results = "hide"}
 if (!dir.exists("affinity/")) dir.create("affinity/")
 if (!dir.exists("affinity/raw")) dir.create("affinity/raw")
 if (!dir.exists("affinity/derived")) dir.create("affinity/derived")
