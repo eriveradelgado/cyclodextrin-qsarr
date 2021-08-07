@@ -225,7 +225,8 @@ readRDS("affinity/derived/suzuki-df.RDS") %>%
   mutate(dG = as.numeric(dG)) %>%
   mutate(guest = str_replace(guest, "\u2009", " ")) %>%
   filter(!is.na(dG)) %>%
-  saveRDS(suzuki, "affinity/clean/suzuki.RDS")
+  # << Change from suzuki as an object to the . for the pipe to execute correctly. >>
+  saveRDS(., file =  "affinity/clean/suzuki.RDS")
 ```
 
 ## Singh et al dataset
